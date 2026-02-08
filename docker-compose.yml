@@ -15,5 +15,20 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://incident:incident@db:5432/incident_response
+      DATA_DIR: /app/data
+    volumes:
+      - ./data:/app/data:ro
+      - ./backend/app:/app/app # dev hot-reload; drop for a production image
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:
