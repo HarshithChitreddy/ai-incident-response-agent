@@ -37,3 +37,20 @@ class Incident(Base):
         cascade="all, delete-orphan",
         order_by="AlertEvent.received_at",
     )
+
+
+class AlertEvent(Base):
+    """Raw alert payload received for an incident — the audit trail of every
+    firing/resolved notification, kept verbatim for the agent and the dashboard."""
+
+    __tablename__ = "alert_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    incident_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("incidents.id", ondelete="CASCADE"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(16))
+    payload: Mapped[dict] = mapped_column(JSONVariant, default=dict)
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    incident: Mapped[Incident] = relationship(back_populates="events")
