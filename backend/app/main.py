@@ -1,8 +1,23 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from app.config import get_settings
+from app.db.session import engine
+from app.models import Base
 
-app = FastAPI(title=get_settings().app_name)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # create_all keeps the demo self-bootstrapping; introduce Alembic only if
+    # the schema starts churning after Phase 2
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    await engine.dispose()
+
+
+app = FastAPI(title=get_settings().app_name, lifespan=lifespan)
 
 
 @app.get("/healthz", tags=["meta"])
