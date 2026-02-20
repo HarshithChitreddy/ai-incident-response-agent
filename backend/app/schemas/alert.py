@@ -21,3 +21,17 @@ class AlertmanagerAlert(BaseModel):
     ends_at: datetime | None = Field(default=None, alias="endsAt")
     generator_url: str = Field(default="", alias="generatorURL")
     fingerprint: str = ""
+
+
+class AlertmanagerWebhook(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    version: str = "4"
+    group_key: str = Field(default="", alias="groupKey")
+    status: Literal["firing", "resolved"] = "firing"
+    receiver: str = ""
+    group_labels: dict[str, str] = Field(default_factory=dict, alias="groupLabels")
+    common_labels: dict[str, str] = Field(default_factory=dict, alias="commonLabels")
+    common_annotations: dict[str, str] = Field(default_factory=dict, alias="commonAnnotations")
+    external_url: str = Field(default="", alias="externalURL")
+    alerts: list[AlertmanagerAlert] = Field(min_length=1)
