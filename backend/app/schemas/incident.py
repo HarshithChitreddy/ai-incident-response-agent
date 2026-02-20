@@ -34,3 +34,12 @@ class IncidentOut(BaseModel):
 
 class IncidentDetailOut(IncidentOut):
     events: list[AlertEventOut]
+
+
+class WebhookIngestResult(BaseModel):
+    """Summary of what one webhook delivery did, keyed by incident id."""
+
+    created: list[uuid.UUID]
+    updated: list[uuid.UUID]
+    resolved: list[uuid.UUID]
+    ignored: int
