@@ -49,3 +49,11 @@ def _incident_from_alert(alert: AlertmanagerAlert, fingerprint: str) -> Incident
         annotations=alert.annotations,
         started_at=alert.starts_at,
     )
+
+
+def _event_from_alert(incident: Incident, alert: AlertmanagerAlert) -> AlertEvent:
+    return AlertEvent(
+        incident=incident,
+        status=alert.status,
+        payload=alert.model_dump(mode="json", by_alias=True),
+    )
