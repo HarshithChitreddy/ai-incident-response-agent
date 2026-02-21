@@ -57,3 +57,36 @@ def _event_from_alert(incident: Incident, alert: AlertmanagerAlert) -> AlertEven
         status=alert.status,
         payload=alert.model_dump(mode="json", by_alias=True),
     )
+
+
+async def ingest_webhook(db: AsyncSession, payload: AlertmanagerWebhook) -> WebhookIngestResult:
+    result = WebhookIngestResult(created=[], updated=[], resolved=[], ignored=0)
+
+    for alert in payload.alerts:
+        fingerprint = compute_fingerprint(alert)
+        incident = await find_open_incident(db, fingerprint)
+
+        if alert.status == "firing":
+            if incident is None:
+                incident = _incident_from_alert(alert, fingerprint)
+                db.add(incident)
+                await db.flush()
+                result.created.append(incident.id)
+            else:
+                incident.updated_at = utcnow()
+                result.updated.append(incident.id)
+            db.add(_event_from_alert(incident, alert))
+        else:  # resolved
+            if incident is None:
+                # resolved notification for something we never opened
+                result.ignored += 1
+                continue
+            incident.status = "resolved"
+            # Alertmanager's zero value for endsAt is year 1 — treat it as unset
+            ends = alert.ends_at
+            incident.resolved_at = ends if ends is not None and ends.year > 1 else utcnow()
+            db.add(_event_from_alert(incident, alert))
+            result.resolved.append(incident.id)
+
+    await db.commit()
+    return result
