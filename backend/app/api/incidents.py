@@ -38,3 +38,20 @@ async def get_incident(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db
     if incident is None:
         raise HTTPException(status_code=404, detail="Incident not found")
     return incident
+
+
+@router.post("/{incident_id}/resolve", response_model=IncidentOut)
+async def resolve_incident(
+    incident_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+) -> Incident:
+    """Manually resolve an incident."""
+    incident = await db.get(Incident, incident_id)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if incident.status != "resolved":
+        incident.status = "resolved"
+        incident.resolved_at = utcnow()
+        await db.commit()
+        await db.refresh(incident)
+    return incident
