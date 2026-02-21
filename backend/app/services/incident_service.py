@@ -33,3 +33,19 @@ async def find_open_incident(db: AsyncSession, fingerprint: str) -> Incident | N
         .limit(1)
     )
     return await db.scalar(stmt)
+
+
+def _incident_from_alert(alert: AlertmanagerAlert, fingerprint: str) -> Incident:
+    alertname = alert.labels.get("alertname", "UnknownAlert")
+    service = alert.labels.get("service") or alert.labels.get("job") or "unknown"
+    return Incident(
+        fingerprint=fingerprint,
+        alertname=alertname,
+        service=service,
+        severity=alert.labels.get("severity", "warning"),
+        title=alert.annotations.get("summary") or f"{alertname} on {service}",
+        description=alert.annotations.get("description", ""),
+        labels=alert.labels,
+        annotations=alert.annotations,
+        started_at=alert.starts_at,
+    )
