@@ -25,3 +25,16 @@ async def list_incidents(
     if status is not None:
         stmt = stmt.where(Incident.status == status)
     return list((await db.scalars(stmt)).all())
+
+
+@router.get("/{incident_id}", response_model=IncidentDetailOut)
+async def get_incident(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> Incident:
+    stmt = (
+        select(Incident)
+        .options(selectinload(Incident.events))
+        .where(Incident.id == incident_id)
+    )
+    incident = await db.scalar(stmt)
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    return incident
