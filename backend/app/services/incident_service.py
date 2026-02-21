@@ -23,3 +23,13 @@ def compute_fingerprint(alert: AlertmanagerAlert) -> str:
         return alert.fingerprint
     canonical = json.dumps(alert.labels, sort_keys=True)
     return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+
+async def find_open_incident(db: AsyncSession, fingerprint: str) -> Incident | None:
+    stmt = (
+        select(Incident)
+        .where(Incident.fingerprint == fingerprint, Incident.status.in_(OPEN_STATUSES))
+        .order_by(Incident.created_at.desc())
+        .limit(1)
+    )
+    return await db.scalar(stmt)
