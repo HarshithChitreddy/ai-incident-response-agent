@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api import alerts
 from app.config import get_settings
 from app.db.session import engine
 from app.models import Base
@@ -18,6 +19,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=get_settings().app_name, lifespan=lifespan)
+
+app.include_router(alerts.router, prefix="/api/v1")
 
 
 @app.get("/healthz", tags=["meta"])
