@@ -24,3 +24,17 @@ async def test_firing_alert_creates_incident(client):
     assert incident["fingerprint"] == "fp-checkout-5xx"
     assert len(incident["events"]) == 1
     assert incident["events"][0]["status"] == "firing"
+
+
+async def test_duplicate_fingerprint_attaches_event_not_new_incident(client):
+    first = (await client.post(WEBHOOK_URL, json=make_webhook())).json()
+    second = (await client.post(WEBHOOK_URL, json=make_webhook())).json()
+
+    assert second["created"] == []
+    assert second["updated"] == first["created"]
+
+    incidents = (await client.get("/api/v1/incidents")).json()
+    assert len(incidents) == 1
+
+    detail = (await client.get(f"/api/v1/incidents/{first['created'][0]}")).json()
+    assert len(detail["events"]) == 2
