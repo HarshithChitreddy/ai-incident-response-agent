@@ -63,3 +63,21 @@ async def test_resolved_alert_without_open_incident_is_ignored(client):
     resp = (await client.post(WEBHOOK_URL, json=payload)).json()
     assert resp["ignored"] == 1
     assert resp["created"] == [] and resp["resolved"] == []
+
+
+async def test_multiple_alerts_in_one_delivery(client):
+    payload = make_webhook(
+        alerts=[
+            make_alert(fingerprint="fp-a", service="checkout-service"),
+            make_alert(
+                fingerprint="fp-b",
+                service="orders-service",
+                alertname="DBConnectionPoolExhausted",
+            ),
+        ]
+    )
+    resp = (await client.post(WEBHOOK_URL, json=payload)).json()
+    assert len(resp["created"]) == 2
+
+    incidents = (await client.get("/api/v1/incidents")).json()
+    assert {i["service"] for i in incidents} == {"checkout-service", "orders-service"}
