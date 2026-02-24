@@ -38,3 +38,28 @@ async def test_duplicate_fingerprint_attaches_event_not_new_incident(client):
 
     detail = (await client.get(f"/api/v1/incidents/{first['created'][0]}")).json()
     assert len(detail["events"]) == 2
+
+
+async def test_resolved_alert_resolves_incident(client):
+    created = (await client.post(WEBHOOK_URL, json=make_webhook())).json()["created"]
+
+    resolved_payload = make_webhook(
+        alerts=[make_alert(status="resolved", ends_at="2026-07-07T15:04:05Z")],
+        status="resolved",
+    )
+    resp = (await client.post(WEBHOOK_URL, json=resolved_payload)).json()
+    assert resp["resolved"] == created
+
+    incident = (await client.get(f"/api/v1/incidents/{created[0]}")).json()
+    assert incident["status"] == "resolved"
+    assert incident["resolved_at"] is not None
+
+
+async def test_resolved_alert_without_open_incident_is_ignored(client):
+    payload = make_webhook(
+        alerts=[make_alert(status="resolved", fingerprint="never-seen")],
+        status="resolved",
+    )
+    resp = (await client.post(WEBHOOK_URL, json=payload)).json()
+    assert resp["ignored"] == 1
+    assert resp["created"] == [] and resp["resolved"] == []
