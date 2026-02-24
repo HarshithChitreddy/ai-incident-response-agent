@@ -81,3 +81,13 @@ async def test_multiple_alerts_in_one_delivery(client):
 
     incidents = (await client.get("/api/v1/incidents")).json()
     assert {i["service"] for i in incidents} == {"checkout-service", "orders-service"}
+
+
+async def test_missing_fingerprint_is_computed_from_labels(client):
+    alert = make_alert(fingerprint="")
+    first = (await client.post(WEBHOOK_URL, json=make_webhook(alerts=[alert]))).json()
+    second = (await client.post(WEBHOOK_URL, json=make_webhook(alerts=[alert]))).json()
+
+    # same labels -> same computed fingerprint -> dedup still works
+    assert len(first["created"]) == 1
+    assert second["updated"] == first["created"]
