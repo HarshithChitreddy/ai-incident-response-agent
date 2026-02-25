@@ -91,3 +91,11 @@ async def test_missing_fingerprint_is_computed_from_labels(client):
     # same labels -> same computed fingerprint -> dedup still works
     assert len(first["created"]) == 1
     assert second["updated"] == first["created"]
+
+
+async def test_invalid_payload_is_rejected(client):
+    resp = await client.post(WEBHOOK_URL, json={"version": "4", "alerts": []})
+    assert resp.status_code == 422
+
+    resp = await client.post(WEBHOOK_URL, json={"alerts": [{"status": "exploded"}]})
+    assert resp.status_code == 422
