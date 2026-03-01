@@ -23,3 +23,13 @@ async def test_list_incidents_filters_by_status(client):
 async def test_get_unknown_incident_returns_404(client):
     resp = await client.get(f"/api/v1/incidents/{uuid.uuid4()}")
     assert resp.status_code == 404
+
+
+async def test_manual_resolve_is_idempotent(client):
+    created = (await client.post(WEBHOOK_URL, json=make_webhook())).json()["created"]
+
+    first = (await client.post(f"/api/v1/incidents/{created[0]}/resolve")).json()
+    second = (await client.post(f"/api/v1/incidents/{created[0]}/resolve")).json()
+
+    assert first["status"] == "resolved"
+    assert second["resolved_at"] == first["resolved_at"]
