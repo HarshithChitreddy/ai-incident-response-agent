@@ -18,3 +18,8 @@ async def test_list_incidents_filters_by_status(client):
     assert len(open_incidents) == 1
     assert len(resolved) == 1
     assert resolved[0]["id"] == created[0]
+
+
+async def test_get_unknown_incident_returns_404(client):
+    resp = await client.get(f"/api/v1/incidents/{uuid.uuid4()}")
+    assert resp.status_code == 404
