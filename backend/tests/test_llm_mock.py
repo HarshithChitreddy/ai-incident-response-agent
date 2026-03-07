@@ -141,3 +141,43 @@ async def test_mock_tool_inputs_satisfy_the_schema():
     assert call2.name == "search_logs"
     assert call2.input["level"] in ("ERROR", "WARNING", "INFO")
     assert set(call2.input) >= {"service", "query", "level"}
+
+
+async def test_mock_without_tools_returns_final_text():
+    client = MockLLMClient()
+    resp = await client.create_message(
+        system="Analyze the incident evidence.",
+        messages=[{"role": "user", "content": "Evidence for search-service latency"}],
+    )
+    assert resp.stop_reason == "end_turn"
+    assert resp.tool_calls == []
+    assert "search-service" in resp.text
+
+
+async def test_mock_slack_brief_prompt():
+    client = MockLLMClient()
+    resp = await client.create_message(
+        system="Write a Slack incident brief for the on-call channel.",
+        messages=[{"role": "user", "content": "Incident on checkout-service"}],
+    )
+    assert "CRITICAL" in resp.text
+    assert "checkout-service" in resp.text
+
+
+async def test_mock_postmortem_prompt():
+    client = MockLLMClient()
+    resp = await client.create_message(
+        system="Generate a postmortem for the resolved incident.",
+        messages=[{"role": "user", "content": "Resolved incident on checkout-service"}],
+    )
+    assert resp.text.startswith("# Postmortem")
+    for section in ("## Summary", "## Timeline", "## Root Cause", "## Action Items"):
+        assert section in resp.text
+
+
+async def test_mock_reports_usage_and_model():
+    client = MockLLMClient(model="mock/claude-opus-4-8")
+    resp = await client.create_message(system="x", messages=[{"role": "user", "content": "y"}])
+    assert resp.model == "mock/claude-opus-4-8"
+    assert resp.usage["input_tokens"] > 0
+    assert resp.usage["output_tokens"] > 0
