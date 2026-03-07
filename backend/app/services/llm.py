@@ -247,3 +247,49 @@ Rolled back to the prior release, restoring the 5s timeout and removing the retr
 ## Prevention
 Timeout changes must reference measured upstream latency percentiles in the PR description.
 """
+
+
+# --------------------------------------------------------------------------- #
+# Real implementation
+# --------------------------------------------------------------------------- #
+
+
+class AnthropicLLMClient:
+    def __init__(self, settings: Settings) -> None:
+        # Imported here so mock-only environments never need the SDK at import time
+        from anthropic import AsyncAnthropic
+
+        # api_key=None lets the SDK fall back to its own env/profile resolution
+        self._client = AsyncAnthropic(api_key=settings.anthropic_api_key or None)
+        self.model = settings.anthropic_model
+
+    async def create_message(
+        self,
+        *,
+        system: str,
+        messages: list[Message],
+        tools: list[dict[str, Any]] | None = None,
+        max_tokens: int = 16000,
+    ) -> LLMResponse:
+        kwargs: dict[str, Any] = {}
+        if tools:
+            kwargs["tools"] = tools
+
+        resp = await self._client.messages.create(
+            model=self.model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=messages,
+            thinking={"type": "adaptive"},
+            **kwargs,
+        )
+        data = resp.model_dump(mode="json")
+        return LLMResponse(
+            content=data["content"],
+            stop_reason=data["stop_reason"] or "end_turn",
+            model=data["model"],
+            usage={
+                "input_tokens": data["usage"]["input_tokens"],
+                "output_tokens": data["usage"]["output_tokens"],
+            },
+        )
