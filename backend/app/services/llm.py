@@ -56,3 +56,14 @@ class LLMResponse:
 
     def as_assistant_message(self) -> Message:
         return {"role": "assistant", "content": self.content}
+
+
+class LLMClient(Protocol):
+    async def create_message(
+        self,
+        *,
+        system: str,
+        messages: list[Message],
+        tools: list[dict[str, Any]] | None = None,
+        max_tokens: int = 16000,
+    ) -> LLMResponse: ...
