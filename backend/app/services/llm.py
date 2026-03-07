@@ -293,3 +293,10 @@ class AnthropicLLMClient:
                 "output_tokens": data["usage"]["output_tokens"],
             },
         )
+
+
+def get_llm_client(settings: Settings | None = None) -> LLMClient:
+    settings = settings or get_settings()
+    if settings.mock_llm:
+        return MockLLMClient(model=f"mock/{settings.anthropic_model}")
+    return AnthropicLLMClient(settings)
