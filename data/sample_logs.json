@@ -1,0 +1,29 @@
+[
+  { "timestamp": "2026-07-07T13:36:12Z", "service": "checkout-service", "level": "ERROR", "logger": "checkout.clients.payment_gateway", "trace_id": "tr-8842a1", "message": "PaymentGatewayTimeout: authorize() exceeded 2000ms deadline (attempt 1/3), order_id=ord-559182" },
+  { "timestamp": "2026-07-07T13:36:14Z", "service": "checkout-service", "level": "ERROR", "logger": "checkout.clients.payment_gateway", "trace_id": "tr-8842a1", "message": "PaymentGatewayTimeout: authorize() exceeded 2000ms deadline (attempt 2/3), order_id=ord-559182" },
+  { "timestamp": "2026-07-07T13:36:16Z", "service": "checkout-service", "level": "ERROR", "logger": "checkout.clients.payment_gateway", "trace_id": "tr-8842a1", "message": "PaymentGatewayTimeout: authorize() exceeded 2000ms deadline (attempt 3/3), giving up, order_id=ord-559182" },
+  { "timestamp": "2026-07-07T13:36:16Z", "service": "checkout-service", "level": "ERROR", "logger": "checkout.api.confirm", "trace_id": "tr-8842a1", "message": "POST /api/checkout/confirm -> 502 payment authorization failed after retries, order_id=ord-559182" },
+  { "timestamp": "2026-07-07T13:41:53Z", "service": "checkout-service", "level": "WARNING", "logger": "checkout.clients.payment_gateway", "trace_id": "tr-91c3f0", "message": "payment-gateway upstream p50 latency 2140ms over last 1m; deadline is 2000ms" },
+  { "timestamp": "2026-07-07T13:45:07Z", "service": "checkout-service", "level": "ERROR", "logger": "checkout.api.confirm", "trace_id": "tr-93aa07", "message": "POST /api/checkout/confirm -> 502 payment authorization failed after retries, order_id=ord-559347" },
+  { "timestamp": "2026-07-07T13:52:30Z", "service": "payment-gateway", "level": "WARNING", "logger": "gateway.throttle", "trace_id": "tr-93aa07", "message": "Request volume from checkout-service up 2.9x in 20m (retry storm suspected); soft throttling engaged" },
+  { "timestamp": "2026-07-07T13:58:44Z", "service": "checkout-service", "level": "ERROR", "logger": "checkout.clients.payment_gateway", "trace_id": "tr-97be55", "message": "PaymentGatewayTimeout: authorize() exceeded 2000ms deadline (attempt 3/3), giving up, order_id=ord-560021" },
+  { "timestamp": "2026-07-07T14:01:19Z", "service": "checkout-service", "level": "ERROR", "logger": "checkout.api.confirm", "trace_id": "tr-99d2c8", "message": "POST /api/checkout/confirm -> 502 payment authorization failed after retries, order_id=ord-560198" },
+  { "timestamp": "2026-07-07T14:01:20Z", "service": "checkout-service", "level": "INFO", "logger": "checkout.deploy", "trace_id": null, "message": "Running release 2026-07-07.2 (commit 9f2c41ab7e03), deployed 13:12:44Z" },
+
+  { "timestamp": "2026-07-07T13:20:05Z", "service": "orders-service", "level": "WARNING", "logger": "orders.db.pool", "trace_id": "tr-71f2e4", "message": "Connection pool saturated: 5/5 in use, 3 waiters queued" },
+  { "timestamp": "2026-07-07T13:48:33Z", "service": "orders-service", "level": "ERROR", "logger": "orders.db.pool", "trace_id": "tr-74b901", "message": "TimeoutError: could not acquire connection from pool within 10s (size=5, overflow=0)" },
+  { "timestamp": "2026-07-07T14:15:41Z", "service": "orders-service", "level": "ERROR", "logger": "orders.api.create", "trace_id": "tr-79cc12", "message": "POST /api/orders -> 503 database connection unavailable" },
+  { "timestamp": "2026-07-07T14:18:02Z", "service": "orders-service", "level": "INFO", "logger": "orders.deploy", "trace_id": null, "message": "Running release 2026-07-07.1 (commit e71a5cd90b26), deployed 12:30:15Z" },
+
+  { "timestamp": "2026-07-07T13:30:57Z", "service": "search-service", "level": "WARNING", "logger": "search.query.parser", "trace_id": "tr-61aa38", "message": "Synonym expansion produced 48 terms for query 'running shoes'; ES query time 1840ms" },
+  { "timestamp": "2026-07-07T13:59:26Z", "service": "search-service", "level": "WARNING", "logger": "search.es.client", "trace_id": "tr-64d7f5", "message": "Elasticsearch took 2210ms for expanded bool query (top-level clauses: 52)" },
+  { "timestamp": "2026-07-07T14:08:11Z", "service": "search-service", "level": "ERROR", "logger": "search.api.search", "trace_id": "tr-66e803", "message": "GET /api/search -> 504 upstream timeout after 3000ms, query='summer dress'" },
+
+  { "timestamp": "2026-07-07T12:40:22Z", "service": "recommendation-service", "level": "WARNING", "logger": "reco.runtime", "trace_id": null, "message": "Heap usage 74% (3.0GiB/4.0GiB); embedding_cache entries=412884" },
+  { "timestamp": "2026-07-07T13:40:22Z", "service": "recommendation-service", "level": "WARNING", "logger": "reco.runtime", "trace_id": null, "message": "Heap usage 84% (3.4GiB/4.0GiB); embedding_cache entries=655109" },
+  { "timestamp": "2026-07-07T14:25:22Z", "service": "recommendation-service", "level": "WARNING", "logger": "reco.runtime", "trace_id": null, "message": "Heap usage 91% (3.7GiB/4.0GiB); embedding_cache entries=901473; GC pause p99 340ms" },
+
+  { "timestamp": "2026-07-07T13:00:01Z", "service": "checkout-service", "level": "INFO", "logger": "checkout.api.confirm", "trace_id": "tr-80aa01", "message": "POST /api/checkout/confirm -> 200 in 412ms, order_id=ord-558901" },
+  { "timestamp": "2026-07-07T13:10:44Z", "service": "orders-service", "level": "INFO", "logger": "orders.api.create", "trace_id": "tr-70cc19", "message": "POST /api/orders -> 201 in 98ms" },
+  { "timestamp": "2026-07-07T13:15:30Z", "service": "search-service", "level": "INFO", "logger": "search.api.search", "trace_id": "tr-60bb77", "message": "GET /api/search -> 200 in 310ms, query='wireless earbuds'" }
+]
