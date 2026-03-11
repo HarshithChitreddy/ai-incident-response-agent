@@ -1,0 +1,31 @@
+service,alertname,severity,error_rate_pct,latency_p95_ms,request_rate_rps,cpu_pct,memory_pct,deploy_within_hour,root_cause,time_to_resolve_min,summary
+checkout-service,HighErrorRate,critical,9.8,1900,140,70,60,1,bad_deploy,42,Payment retry logic deployed without backoff caused gateway throttling
+checkout-service,HighErrorRate,critical,15.2,2400,150,75,62,1,bad_deploy,55,Null pointer in new discount code path returned 500s on 15% of checkouts
+checkout-service,HighErrorRate,warning,3.1,800,130,55,58,0,upstream_dependency,25,Payment gateway provider had elevated latency in us-east-1
+checkout-service,HighLatencyP95,warning,1.2,1600,135,68,61,0,traffic_spike,30,Flash sale doubled checkout traffic; autoscaler lagged by 20 minutes
+orders-service,DBConnectionPoolExhausted,critical,6.5,9000,64,40,54,1,config_change,38,Pool size lowered during cost cleanup; saturated at normal load
+orders-service,DBConnectionPoolExhausted,critical,8.2,10000,70,42,55,0,db_saturation,95,Unindexed query from new reporting job held connections for minutes
+orders-service,HighErrorRate,critical,7.4,4200,66,45,56,1,bad_deploy,48,Migration locked orders table during peak; writes timed out
+orders-service,HighLatencyP95,warning,1.8,2600,62,39,53,0,db_saturation,60,Vacuum fell behind after bulk import; sequential scans everywhere
+search-service,HighLatencyP95,warning,0.9,2200,215,66,67,1,bad_deploy,35,Query expansion change multiplied Elasticsearch clause count
+search-service,HighLatencyP95,warning,1.1,1900,240,72,69,0,traffic_spike,20,Bot crawl tripled query volume; rate limiting was disabled
+search-service,HighErrorRate,critical,6.0,3000,210,80,70,0,upstream_dependency,70,Elasticsearch data node lost; shard recovery degraded queries
+recommendation-service,HighMemoryUsage,warning,0.3,350,95,55,92,1,memory_leak,120,In-process cache without eviction grew until OOM kill
+recommendation-service,HighMemoryUsage,warning,0.2,300,90,52,90,0,memory_leak,180,Tensor references retained across batches leaked GPU-pinned host memory
+recommendation-service,HighErrorRate,critical,5.5,900,92,60,75,1,bad_deploy,40,Model artifact version mismatch made feature vectors misaligned
+payments-service,HighErrorRate,critical,11.0,2100,85,65,60,1,bad_deploy,50,Secrets rotation missed one pod; auth failures on half the fleet
+payments-service,HighErrorRate,warning,2.8,700,80,50,58,0,upstream_dependency,45,Card network intermittent declines; retried transactions recovered
+payments-service,HighLatencyP95,warning,1.0,1500,82,58,59,0,db_saturation,55,Hot partition on ledger table after account id sequence reset
+checkout-service,HighErrorRate,critical,13.5,2300,148,74,63,1,bad_deploy,44,Tightened timeout below upstream p50 triggered retry storm
+checkout-service,HighMemoryUsage,warning,0.4,450,125,52,89,0,memory_leak,150,Session objects pinned by analytics middleware never released
+orders-service,HighErrorRate,warning,2.5,1900,60,38,52,0,upstream_dependency,35,Inventory service brownout returned 429s; orders retried and succeeded
+search-service,HighMemoryUsage,warning,0.2,600,200,60,93,1,memory_leak,90,Synonym dictionary reloaded per request instead of at startup
+recommendation-service,HighLatencyP95,warning,0.5,1200,98,70,78,1,config_change,25,Batch size doubled without GPU headroom; queueing delay grew
+payments-service,DBConnectionPoolExhausted,critical,9.1,8500,88,48,60,0,db_saturation,110,Long-running reconciliation transaction blocked vacuum and held pool
+checkout-service,HighLatencyP95,warning,1.5,1700,142,71,62,1,bad_deploy,33,Synchronous fraud check added to hot path; upstream p95 dominated
+orders-service,HighMemoryUsage,warning,0.3,400,61,41,91,0,memory_leak,140,ORM identity map retained every order row processed by nightly job
+search-service,HighErrorRate,critical,4.8,2800,205,75,71,1,bad_deploy,38,Malformed index template broke writes to the daily index
+recommendation-service,HighErrorRate,warning,2.2,500,94,54,72,0,upstream_dependency,30,Feature store timeouts; fallback to popularity ranking engaged
+payments-service,HighMemoryUsage,warning,0.2,380,79,49,90,1,memory_leak,160,Webhook payloads buffered in memory while downstream consumer lagged
+checkout-service,DBConnectionPoolExhausted,critical,7.7,7600,138,58,61,0,db_saturation,85,Analytics query on replica failed over to primary and held connections
+search-service,HighLatencyP95,warning,0.7,2050,225,69,68,0,traffic_spike,28,Homepage feature drove 40% more search queries than forecast
