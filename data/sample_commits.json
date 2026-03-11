@@ -1,0 +1,115 @@
+[
+  {
+    "sha": "9f2c41ab7e03",
+    "service": "checkout-service",
+    "author": "maya.okafor",
+    "timestamp": "2026-07-07T13:12:44Z",
+    "message": "Tighten payment gateway timeout from 5s to 2s and add retry wrapper",
+    "files": [
+      "checkout/clients/payment_gateway.py",
+      "checkout/config/timeouts.py"
+    ],
+    "additions": 48,
+    "deletions": 12,
+    "diff_summary": "Reduced PAYMENT_GATEWAY_TIMEOUT_MS from 5000 to 2000 and wrapped authorize() in a 3-attempt retry with no backoff."
+  },
+  {
+    "sha": "4b8e19d3c5f7",
+    "service": "checkout-service",
+    "author": "dan.velasquez",
+    "timestamp": "2026-07-07T11:47:02Z",
+    "message": "Add structured logging for checkout confirmation flow",
+    "files": ["checkout/api/confirm.py", "checkout/logging.py"],
+    "additions": 35,
+    "deletions": 8,
+    "diff_summary": "Added trace-id propagation and JSON log fields to POST /api/checkout/confirm handlers. No behavioral change."
+  },
+  {
+    "sha": "e71a5cd90b26",
+    "service": "orders-service",
+    "author": "priya.raman",
+    "timestamp": "2026-07-07T12:30:15Z",
+    "message": "Reduce DB pool max size from 20 to 5 to cut idle connections on RDS",
+    "files": ["orders/db/pool.py", "orders/config/database.yaml"],
+    "additions": 6,
+    "deletions": 6,
+    "diff_summary": "Lowered SQLAlchemy pool_size from 20 to 5 and max_overflow from 10 to 0 to reduce RDS connection pressure."
+  },
+  {
+    "sha": "12dfe08a94bc",
+    "service": "search-service",
+    "author": "leo.martins",
+    "timestamp": "2026-07-07T09:55:38Z",
+    "message": "Enable synonym expansion in query parser",
+    "files": ["search/query/parser.py", "search/query/synonyms.py"],
+    "additions": 122,
+    "deletions": 4,
+    "diff_summary": "Query parser now expands each token against the synonym dictionary before hitting Elasticsearch; no cap on expanded term count."
+  },
+  {
+    "sha": "77c3ab6f21e9",
+    "service": "recommendation-service",
+    "author": "sofia.nguyen",
+    "timestamp": "2026-07-07T08:20:51Z",
+    "message": "Cache user embeddings in-process to cut feature-store reads",
+    "files": ["reco/serving/embedding_cache.py"],
+    "additions": 64,
+    "deletions": 3,
+    "diff_summary": "Added module-level dict caching user embedding tensors keyed by user_id. No eviction policy yet (TODO)."
+  },
+  {
+    "sha": "a05d92c8471f",
+    "service": "checkout-service",
+    "author": "maya.okafor",
+    "timestamp": "2026-07-06T16:03:27Z",
+    "message": "Bump stripe client library 9.4.1 -> 9.5.0",
+    "files": ["checkout/requirements.txt"],
+    "additions": 1,
+    "deletions": 1,
+    "diff_summary": "Routine dependency bump; changelog lists only webhook signature helper additions."
+  },
+  {
+    "sha": "3c6f10b5d8e2",
+    "service": "orders-service",
+    "author": "dan.velasquez",
+    "timestamp": "2026-07-06T14:41:09Z",
+    "message": "Fix flaky test_order_cancellation integration test",
+    "files": ["tests/integration/test_order_cancellation.py"],
+    "additions": 14,
+    "deletions": 9,
+    "diff_summary": "Replaced sleep-based wait with polling assertion. Test-only change."
+  },
+  {
+    "sha": "58ab34e7f90d",
+    "service": "platform",
+    "author": "ci-bot",
+    "timestamp": "2026-07-07T07:00:12Z",
+    "message": "Update base image to python:3.12.6-slim across services",
+    "files": ["docker/base/Dockerfile"],
+    "additions": 2,
+    "deletions": 2,
+    "diff_summary": "Routine weekly base-image refresh; patch-level Python bump."
+  },
+  {
+    "sha": "cd94f1a2b380",
+    "service": "search-service",
+    "author": "leo.martins",
+    "timestamp": "2026-07-05T17:22:45Z",
+    "message": "Add docs for query parser configuration",
+    "files": ["docs/search-query-parser.md"],
+    "additions": 88,
+    "deletions": 0,
+    "diff_summary": "Documentation only."
+  },
+  {
+    "sha": "f6e2078c13da",
+    "service": "recommendation-service",
+    "author": "sofia.nguyen",
+    "timestamp": "2026-07-04T10:15:33Z",
+    "message": "Raise recommendation batch size 32 -> 64 for GPU utilization",
+    "files": ["reco/serving/batcher.py"],
+    "additions": 3,
+    "deletions": 3,
+    "diff_summary": "Doubles inference batch size; memory profile validated in staging."
+  }
+]
