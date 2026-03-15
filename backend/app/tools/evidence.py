@@ -16,6 +16,16 @@ from app.models import HistoricalIncident
 from app.tools.base import ToolContext
 
 
+_WORD_RE = re.compile(r"[a-z][a-z0-9]+")
+_STOPWORDS = {"the", "and", "for", "with", "this", "that", "runbook", "alert"}
+
+
+def _tokens(text: str) -> set[str]:
+    # split CamelCase (HighErrorRate -> high error rate) before tokenizing
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text)
+    return {t for t in _WORD_RE.findall(spaced.lower()) if t not in _STOPWORDS}
+
+
 async def get_recent_commits(ctx: ToolContext, service: str, limit: int = 10) -> list[dict]:
     commits = json.loads((ctx.settings.data_dir / "sample_commits.json").read_text())
     relevant = [c for c in commits if c["service"] in (service, "platform")]
