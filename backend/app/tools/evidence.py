@@ -41,3 +41,28 @@ async def search_logs(
     ]
     hits.sort(key=lambda entry: entry["timestamp"])
     return hits[:limit]
+
+
+async def query_metrics(ctx: ToolContext, service: str) -> dict:
+    df = pd.read_csv(ctx.settings.data_dir / "sample_metrics.csv")
+    df = df[df["service"] == service].sort_values("timestamp")
+    if df.empty:
+        return {"service": service, "series": [], "summary": {}, "note": "no metrics for service"}
+
+    numeric_cols = [c for c in df.columns if c not in ("timestamp", "service")]
+    summary = {}
+    for col in numeric_cols:
+        baseline = float(df[col].head(3).mean())
+        current = float(df[col].tail(3).mean())
+        delta_pct = ((current - baseline) / baseline * 100) if baseline else None
+        summary[col] = {
+            "baseline": round(baseline, 2),
+            "current": round(current, 2),
+            "delta_pct": round(delta_pct, 1) if delta_pct is not None else None,
+        }
+    return {
+        "service": service,
+        "window": {"from": df["timestamp"].iloc[0], "to": df["timestamp"].iloc[-1]},
+        "summary": summary,
+        "series": df.to_dict(orient="records"),
+    }
