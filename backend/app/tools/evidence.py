@@ -100,3 +100,39 @@ async def retrieve_runbook(ctx: ToolContext, query: str) -> dict:
         "retriever": "keyword",
         "content": best_content,
     }
+
+
+async def find_similar_incidents(
+    ctx: ToolContext,
+    service: str,
+    alertname: str | None = None,
+    limit: int = 5,
+) -> list[dict]:
+    """Past incidents from Postgres — same alert class first, same service second."""
+    stmt = select(HistoricalIncident).limit(50)
+    if alertname:
+        stmt = stmt.where(
+            or_(HistoricalIncident.alertname == alertname, HistoricalIncident.service == service)
+        )
+    else:
+        stmt = stmt.where(HistoricalIncident.service == service)
+
+    rows = (await ctx.db.scalars(stmt)).all()
+    # exact alertname+service matches are the most informative
+    rows = sorted(
+        rows,
+        key=lambda r: (r.alertname == alertname, r.service == service),
+        reverse=True,
+    )[:limit]
+    return [
+        {
+            "service": r.service,
+            "alertname": r.alertname,
+            "severity": r.severity,
+            "root_cause": r.root_cause,
+            "deploy_within_hour": r.deploy_within_hour,
+            "time_to_resolve_min": r.time_to_resolve_min,
+            "summary": r.summary,
+        }
+        for r in rows
+    ]
