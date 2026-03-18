@@ -154,3 +154,10 @@ _BY_NAME = {spec.name: spec for spec in TOOLS}
 
 def anthropic_tool_defs() -> list[dict[str, Any]]:
     return [spec.to_anthropic() for spec in TOOLS]
+
+
+async def dispatch(ctx: ToolContext, name: str, tool_input: dict[str, Any]) -> Any:
+    spec = _BY_NAME.get(name)
+    if spec is None:
+        raise KeyError(f"unknown tool: {name}")
+    return await spec.handler(ctx, **tool_input)
