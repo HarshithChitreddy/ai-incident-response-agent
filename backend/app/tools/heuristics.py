@@ -80,3 +80,73 @@ def _heuristic_severity(
         "signals": signals,
         "method": "heuristic-v0 (fallback: no trained model artifact found)",
     }
+
+
+async def rank_likely_commits(
+    ctx: ToolContext,
+    service: str,
+    incident_started_at: str | None = None,
+) -> list[dict]:
+    commits = json.loads((ctx.settings.data_dir / "sample_commits.json").read_text())
+    candidates = [c for c in commits if c["service"] in (service, "platform")]
+    if not candidates:
+        return []
+
+    # Models (and mocks) can pass junk timestamps — fall back to the newest commit
+    reference = None
+    if incident_started_at:
+        try:
+            reference = datetime.fromisoformat(incident_started_at.replace("Z", "+00:00"))
+        except ValueError:
+            reference = None
+    if reference is None:
+        reference = max(_ts(c) for c in candidates)
+
+    ranked = []
+    for commit in candidates:
+        score = 0.0
+        reasons: list[str] = []
+
+        age_h = (reference - _ts(commit)).total_seconds() / 3600
+        if 0 <= age_h <= 2:
+            score += 3
+            reasons.append(f"deployed {age_h:.1f}h before incident")
+        elif 0 <= age_h <= 6:
+            score += 2
+            reasons.append(f"deployed {age_h:.1f}h before incident")
+        elif 0 <= age_h <= 24:
+            score += 1
+            reasons.append(f"deployed {age_h:.1f}h before incident")
+
+        if commit["service"] == service:
+            score += 2
+            reasons.append("touches the alerting service directly")
+
+        text = (commit["message"] + " " + commit.get("diff_summary", "")).lower()
+        matched = [k for k in RISK_KEYWORDS if k in text][:3]
+        if matched:
+            score += len(matched)
+            reasons.append(f"risky change markers: {', '.join(matched)}")
+
+        files = " ".join(commit.get("files", [])).lower()
+        if files and all(any(m in f for m in LOW_RISK_MARKERS) for f in commit.get("files", [])):
+            score -= 2
+            reasons.append("docs/test-only change")
+
+        ranked.append(
+            {
+                "sha": commit["sha"],
+                "service": commit["service"],
+                "message": commit["message"],
+                "timestamp": commit["timestamp"],
+                "score": round(score, 1),
+                "reasons": reasons,
+            }
+        )
+
+    ranked.sort(key=lambda c: c["score"], reverse=True)
+    return ranked
+
+
+def _ts(commit: dict) -> datetime:
+    return datetime.fromisoformat(commit["timestamp"].replace("Z", "+00:00"))
