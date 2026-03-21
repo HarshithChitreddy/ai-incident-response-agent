@@ -23,6 +23,33 @@ async def ctx(session_factory):
         yield ToolContext(db=db, settings=get_settings())
 
 
+@pytest.fixture
+async def seeded_history(session_factory):
+    rows = [
+        HistoricalIncident(
+            service="checkout-service", alertname="HighErrorRate", severity="critical",
+            error_rate_pct=13.5, latency_p95_ms=2300, request_rate_rps=148, cpu_pct=74,
+            memory_pct=63, deploy_within_hour=True, root_cause="bad_deploy",
+            time_to_resolve_min=44, summary="Tightened timeout below upstream p50 triggered retry storm",
+        ),
+        HistoricalIncident(
+            service="orders-service", alertname="DBConnectionPoolExhausted", severity="critical",
+            error_rate_pct=6.5, latency_p95_ms=9000, request_rate_rps=64, cpu_pct=40,
+            memory_pct=54, deploy_within_hour=True, root_cause="config_change",
+            time_to_resolve_min=38, summary="Pool size lowered during cost cleanup",
+        ),
+        HistoricalIncident(
+            service="search-service", alertname="HighLatencyP95", severity="warning",
+            error_rate_pct=0.9, latency_p95_ms=2200, request_rate_rps=215, cpu_pct=66,
+            memory_pct=67, deploy_within_hour=True, root_cause="bad_deploy",
+            time_to_resolve_min=35, summary="Query expansion multiplied ES clause count",
+        ),
+    ]
+    async with session_factory() as db:
+        db.add_all(rows)
+        await db.commit()
+
+
 async def test_get_recent_commits_filters_and_sorts(ctx):
     commits = await get_recent_commits(ctx, service="checkout-service")
 
@@ -66,3 +93,12 @@ async def test_retrieve_runbook_matches_alert_class(ctx):
 
     pool = await retrieve_runbook(ctx, query="DBConnectionPoolExhausted idle connections")
     assert pool["runbook"] == "db-connection-pool.md"
+
+
+async def test_find_similar_incidents_prefers_same_alertname(ctx, seeded_history):
+    results = await find_similar_incidents(
+        ctx, service="checkout-service", alertname="HighErrorRate"
+    )
+    assert results
+    assert results[0]["alertname"] == "HighErrorRate"
+    assert results[0]["root_cause"] == "bad_deploy"
