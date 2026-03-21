@@ -42,3 +42,15 @@ async def test_search_logs_by_query_and_level(ctx):
 
     nothing = await search_logs(ctx, service="checkout-service", query="zzz-no-match")
     assert nothing == []
+
+
+async def test_query_metrics_summarizes_regression(ctx):
+    result = await query_metrics(ctx, service="checkout-service")
+
+    assert result["series"]
+    err = result["summary"]["error_rate_pct"]
+    assert err["current"] > err["baseline"]  # the seeded story: error rate ramps up
+    assert err["delta_pct"] > 100
+
+    empty = await query_metrics(ctx, service="ghost-service")
+    assert empty["series"] == []
