@@ -31,3 +31,14 @@ async def test_get_recent_commits_filters_and_sorts(ctx):
     assert "checkout-service" in services
     timestamps = [c["timestamp"] for c in commits]
     assert timestamps == sorted(timestamps, reverse=True)
+
+
+async def test_search_logs_by_query_and_level(ctx):
+    errors = await search_logs(ctx, service="checkout-service", level="ERROR")
+    assert errors and all(e["level"] == "ERROR" for e in errors)
+
+    timeouts = await search_logs(ctx, service="checkout-service", query="PaymentGatewayTimeout")
+    assert timeouts and all("PaymentGatewayTimeout" in e["message"] for e in timeouts)
+
+    nothing = await search_logs(ctx, service="checkout-service", query="zzz-no-match")
+    assert nothing == []
