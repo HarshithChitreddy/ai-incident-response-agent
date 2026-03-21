@@ -54,3 +54,15 @@ async def test_query_metrics_summarizes_regression(ctx):
 
     empty = await query_metrics(ctx, service="ghost-service")
     assert empty["series"] == []
+
+
+async def test_retrieve_runbook_matches_alert_class(ctx):
+    # ctx has no injected index, so this exercises the shared accessor path
+    # (routed to the session test index by conftest)
+    result = await retrieve_runbook(ctx, query="HighErrorRate 5xx payment timeouts")
+    assert result["runbook"] == "high-error-rate.md"
+    assert result["retriever"] == "chroma/all-MiniLM-L6-v2"
+    assert "roll back" in result["content"].lower()
+
+    pool = await retrieve_runbook(ctx, query="DBConnectionPoolExhausted idle connections")
+    assert pool["runbook"] == "db-connection-pool.md"
