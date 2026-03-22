@@ -114,3 +114,11 @@ async def test_predict_severity_heuristic_bounds(ctx):
 
     low = await predict_severity(ctx, service="search-service", alertname="HighLatencyP95")
     assert low["severity"] == "low"
+
+
+async def test_rank_likely_commits_finds_the_planted_culprit(ctx):
+    ranked = await rank_likely_commits(
+        ctx, service="checkout-service", incident_started_at="2026-07-07T14:02:00Z"
+    )
+    assert ranked[0]["sha"] == "9f2c41ab7e03"  # the timeout+retry commit
+    assert ranked[0]["score"] > ranked[-1]["score"]
