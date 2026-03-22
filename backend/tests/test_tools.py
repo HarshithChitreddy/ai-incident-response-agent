@@ -122,3 +122,10 @@ async def test_rank_likely_commits_finds_the_planted_culprit(ctx):
     )
     assert ranked[0]["sha"] == "9f2c41ab7e03"  # the timeout+retry commit
     assert ranked[0]["score"] > ranked[-1]["score"]
+
+
+async def test_rank_likely_commits_tolerates_bad_timestamp(ctx):
+    ranked = await rank_likely_commits(
+        ctx, service="checkout-service", incident_started_at="not-a-date"
+    )
+    assert ranked  # falls back to newest-commit reference instead of crashing
