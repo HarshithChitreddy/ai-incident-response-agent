@@ -129,3 +129,19 @@ async def test_rank_likely_commits_tolerates_bad_timestamp(ctx):
         ctx, service="checkout-service", incident_started_at="not-a-date"
     )
     assert ranked  # falls back to newest-commit reference instead of crashing
+
+
+async def test_dispatch_and_registry(ctx):
+    defs = anthropic_tool_defs()
+    names = {d["name"] for d in defs}
+    assert names == {
+        "get_recent_commits", "search_logs", "query_metrics", "retrieve_runbook",
+        "find_similar_incidents", "predict_severity", "rank_likely_commits",
+    }
+    assert all(d["input_schema"]["type"] == "object" for d in defs)
+
+    out = await dispatch(ctx, "get_recent_commits", {"service": "orders-service"})
+    assert isinstance(out, list)
+
+    with pytest.raises(KeyError):
+        await dispatch(ctx, "definitely_not_a_tool", {})
