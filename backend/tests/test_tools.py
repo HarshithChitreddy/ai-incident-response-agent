@@ -102,3 +102,15 @@ async def test_find_similar_incidents_prefers_same_alertname(ctx, seeded_history
     assert results
     assert results[0]["alertname"] == "HighErrorRate"
     assert results[0]["root_cause"] == "bad_deploy"
+
+
+async def test_predict_severity_heuristic_bounds(ctx):
+    critical = await predict_severity(
+        ctx, service="checkout-service", alertname="HighErrorRate",
+        error_rate_pct=12.4, latency_p95_ms=2190, deploy_within_hour=True,
+    )
+    assert critical["severity"] == "critical"
+    assert critical["signals"]
+
+    low = await predict_severity(ctx, service="search-service", alertname="HighLatencyP95")
+    assert low["severity"] == "low"
