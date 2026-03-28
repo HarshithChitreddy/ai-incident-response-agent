@@ -32,3 +32,25 @@ class AgentRun(Base):
         cascade="all, delete-orphan",
         order_by="TraceStep.seq",
     )
+
+
+class TraceStep(Base):
+    """One step of an agent run: an LLM call or a tool call, with its full
+    input and output. This is the dashboard's reasoning timeline."""
+
+    __tablename__ = "agent_trace_steps"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), index=True
+    )
+    seq: Mapped[int]
+    step_type: Mapped[str] = mapped_column(String(32))  # llm_call | tool_call
+    name: Mapped[str] = mapped_column(String(128))
+    input: Mapped[dict] = mapped_column(JSONVariant, default=dict)
+    output: Mapped[dict] = mapped_column(JSONVariant, default=dict)
+    tokens_in: Mapped[int] = mapped_column(default=0)
+    tokens_out: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    run: Mapped[AgentRun] = relationship(back_populates="steps")
