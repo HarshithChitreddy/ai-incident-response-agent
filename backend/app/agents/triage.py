@@ -45,6 +45,8 @@ fences) with these keys:
 - recommended_runbook_steps: array of strings — concrete next actions
 """
 
+VALID_SEVERITIES = {"critical", "high", "medium", "low", "warning"}
+
 
 class TriageState(TypedDict):
     messages: list[dict[str, Any]]
@@ -71,3 +73,28 @@ def incident_prompt(incident: Incident) -> str:
         f"description: {incident.description}\n"
         f"labels: {json.dumps(incident.labels)}\n"
     )
+
+
+def parse_analysis(text: str) -> dict[str, Any]:
+    """Extract the analysis JSON, tolerating fences and surrounding prose."""
+    candidates = [text.strip()]
+    fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
+    if fenced:
+        candidates.insert(0, fenced.group(1).strip())
+    first, last = text.find("{"), text.rfind("}")
+    if first != -1 and last > first:
+        candidates.append(text[first : last + 1])
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+
+    return {
+        "root_cause": text.strip() or "No analysis produced",
+        "confidence": None,
+        "parse_error": True,
+    }
