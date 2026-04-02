@@ -124,4 +124,21 @@ def build_triage_graph(ctx: TriageContext):
             "final_text": "" if wants_tools else resp.text,
         }
 
+    async def tools_node(state: TriageState) -> dict[str, Any]:
+        assistant_content = state["messages"][-1]["content"]
+        results = []
+        for block in assistant_content:
+            if not (isinstance(block, dict) and block.get("type") == "tool_use"):
+                continue
+            tool_input = block.get("input", {})
+            output = await dispatch(ctx.tool_ctx, block["name"], tool_input)
+            await ctx.tracer.record("tool_call", block["name"], tool_input, output)
+            result_block: dict[str, Any] = {
+                "type": "tool_result",
+                "tool_use_id": block["id"],
+                "content": json.dumps(jsonable(output), default=str),
+            }
+            results.append(result_block)
+        return {"messages": state["messages"] + [{"role": "user", "content": results}]}
+
     return agent_node, tools_node
