@@ -98,3 +98,30 @@ def parse_analysis(text: str) -> dict[str, Any]:
         "confidence": None,
         "parse_error": True,
     }
+
+
+def build_triage_graph(ctx: TriageContext):
+    tool_defs = anthropic_tool_defs()
+
+    async def agent_node(state: TriageState) -> dict[str, Any]:
+        resp = await ctx.llm.create_message(
+            system=SYSTEM_PROMPT, messages=state["messages"], tools=tool_defs
+        )
+        await ctx.tracer.record(
+            "llm_call",
+            "triage_agent",
+            {"iteration": state["iterations"]},
+            {"stop_reason": resp.stop_reason, "content": jsonable(resp.content)},
+            tokens_in=resp.usage.get("input_tokens", 0),
+            tokens_out=resp.usage.get("output_tokens", 0),
+        )
+        messages = state["messages"] + [resp.as_assistant_message()]
+        wants_tools = resp.stop_reason == "tool_use"
+        return {
+            "messages": messages,
+            "iterations": state["iterations"] + 1,
+            "done": not wants_tools,
+            "final_text": "" if wants_tools else resp.text,
+        }
+
+    return agent_node, tools_node
