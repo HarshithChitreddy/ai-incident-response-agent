@@ -151,4 +151,22 @@ def build_triage_graph(ctx: TriageContext):
     def route(state: TriageState) -> str:
         return END if state["done"] else "tools"
 
-    return agent_node, tools_node
+    graph = StateGraph(TriageState)
+    graph.add_node("agent", agent_node)
+    graph.add_node("tools", tools_node)
+    graph.add_edge(START, "agent")
+    graph.add_conditional_edges("agent", route, {"tools": "tools", END: END})
+    graph.add_edge("tools", "agent")
+    return graph.compile()
+
+
+async def run_triage_graph(ctx: TriageContext, incident: Incident) -> dict[str, Any]:
+    graph = build_triage_graph(ctx)
+    initial: TriageState = {
+        "messages": [{"role": "user", "content": incident_prompt(incident)}],
+        "iterations": 0,
+        "done": False,
+        "final_text": "",
+    }
+    final_state = await graph.ainvoke(initial, config={"recursion_limit": 3 * MAX_ITERATIONS})
+    return parse_analysis(final_state["final_text"])
