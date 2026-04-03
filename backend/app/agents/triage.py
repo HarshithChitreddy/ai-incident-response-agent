@@ -131,13 +131,20 @@ def build_triage_graph(ctx: TriageContext):
             if not (isinstance(block, dict) and block.get("type") == "tool_use"):
                 continue
             tool_input = block.get("input", {})
-            output = await dispatch(ctx.tool_ctx, block["name"], tool_input)
+            try:
+                output = await dispatch(ctx.tool_ctx, block["name"], tool_input)
+                is_error = False
+            except Exception as exc:  # tool failures go back to the model, not up the stack
+                output = {"error": f"{type(exc).__name__}: {exc}"}
+                is_error = True
             await ctx.tracer.record("tool_call", block["name"], tool_input, output)
             result_block: dict[str, Any] = {
                 "type": "tool_result",
                 "tool_use_id": block["id"],
                 "content": json.dumps(jsonable(output), default=str),
             }
+            if is_error:
+                result_block["is_error"] = True
             results.append(result_block)
         return {"messages": state["messages"] + [{"role": "user", "content": results}]}
 
