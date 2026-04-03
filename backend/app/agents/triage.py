@@ -116,7 +116,7 @@ def build_triage_graph(ctx: TriageContext):
             tokens_out=resp.usage.get("output_tokens", 0),
         )
         messages = state["messages"] + [resp.as_assistant_message()]
-        wants_tools = resp.stop_reason == "tool_use"
+        wants_tools = resp.stop_reason == "tool_use" and state["iterations"] < MAX_ITERATIONS
         return {
             "messages": messages,
             "iterations": state["iterations"] + 1,
@@ -147,5 +147,8 @@ def build_triage_graph(ctx: TriageContext):
                 result_block["is_error"] = True
             results.append(result_block)
         return {"messages": state["messages"] + [{"role": "user", "content": results}]}
+
+    def route(state: TriageState) -> str:
+        return END if state["done"] else "tools"
 
     return agent_node, tools_node
