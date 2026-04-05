@@ -18,6 +18,12 @@ _SLACK_SYSTEM = (
     "with confidence, user impact, and the immediate next step. No preamble."
 )
 
+_POSTMORTEM_SYSTEM = (
+    "You write blameless engineering postmortems in Markdown. Structure: "
+    "# Postmortem title, then sections: ## Summary, ## Timeline (UTC), ## Root Cause, "
+    "## Impact, ## Resolution, ## Action Items (numbered), ## Prevention. "
+    "Be specific and factual; use only the evidence provided. No preamble."
+)
 
 _ANALYSIS_KEYS = (
     "root_cause",
@@ -56,6 +62,28 @@ async def generate_slack_brief(
             {
                 "role": "user",
                 "content": f"Write the Slack brief for this incident:\n{json.dumps(payload, default=str)}",
+            }
+        ],
+    )
+
+
+async def generate_postmortem(
+    llm: LLMClient,
+    incident: Incident,
+    analysis: dict[str, Any],
+    timeline: list[dict[str, Any]],
+) -> LLMResponse:
+    payload = {
+        "incident": _incident_context(incident),
+        "analysis": {k: analysis.get(k) for k in _ANALYSIS_KEYS},
+        "timeline": timeline,
+    }
+    return await llm.create_message(
+        system=_POSTMORTEM_SYSTEM,
+        messages=[
+            {
+                "role": "user",
+                "content": f"Write the postmortem for this resolved incident:\n{json.dumps(payload, default=str)}",
             }
         ],
     )
