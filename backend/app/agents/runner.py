@@ -92,3 +92,65 @@ async def run_triage_for_incident(
             run.error = f"{type(exc).__name__}: {exc}"
             run.finished_at = utcnow()
             await db.commit()
+
+
+async def run_postmortem_for_incident(
+    incident_id,
+    session_factory: async_sessionmaker[AsyncSession] | None = None,
+    llm: LLMClient | None = None,
+) -> None:
+    factory = session_factory or _default_factory()
+    llm = llm or get_llm_client()
+
+    async with factory() as db:
+        incident = await db.scalar(
+            select(Incident).options(selectinload(Incident.events)).where(Incident.id == incident_id)
+        )
+        if incident is None:
+            logger.warning("postmortem requested for unknown incident %s", incident_id)
+            return
+
+        analysis = await _latest_analysis(db, incident) or {
+            "root_cause": "No automated analysis was completed for this incident."
+        }
+
+        run = AgentRun(incident_id=incident.id, kind="postmortem", model=getattr(llm, "model", ""))
+        db.add(run)
+        await db.commit()
+        await db.refresh(run)
+        tracer = AgentTracer(db, run)
+
+        try:
+            resp = await generate_postmortem(llm, incident, analysis, [])
+            await tracer.record(
+                "llm_call",
+                "generate_postmortem",
+                {"incident_id": str(incident.id)},
+                {"text": resp.text},
+                tokens_in=resp.usage.get("input_tokens", 0),
+                tokens_out=resp.usage.get("output_tokens", 0),
+            )
+            run.result = {"markdown": resp.text}
+            run.status = "completed"
+            run.finished_at = utcnow()
+            await db.commit()
+        except Exception as exc:
+            logger.exception("postmortem run %s failed", run.id)
+            run.status = "failed"
+            run.error = f"{type(exc).__name__}: {exc}"
+            run.finished_at = utcnow()
+            await db.commit()
+
+
+async def _latest_analysis(db: AsyncSession, incident: Incident) -> dict | None:
+    run = await db.scalar(
+        select(AgentRun)
+        .where(
+            AgentRun.incident_id == incident.id,
+            AgentRun.kind == "triage",
+            AgentRun.status == "completed",
+        )
+        .order_by(AgentRun.started_at.desc())
+        .limit(1)
+    )
+    return run.result if run else None
