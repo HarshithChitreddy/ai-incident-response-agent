@@ -64,25 +64,31 @@ async def run_triage_for_incident(
             tracer=tracer,
         )
 
-        analysis = await run_triage_graph(ctx, incident)
+        try:
+            analysis = await run_triage_graph(ctx, incident)
 
-        brief = await generate_slack_brief(llm, incident, analysis)
-        await tracer.record(
-            "llm_call",
-            "generate_slack_brief",
-            {"incident_id": str(incident.id)},
-            {"text": brief.text},
-            tokens_in=brief.usage.get("input_tokens", 0),
-            tokens_out=brief.usage.get("output_tokens", 0),
-        )
-        analysis["slack_brief"] = brief.text
+            brief = await generate_slack_brief(llm, incident, analysis)
+            await tracer.record(
+                "llm_call",
+                "generate_slack_brief",
+                {"incident_id": str(incident.id)},
+                {"text": brief.text},
+                tokens_in=brief.usage.get("input_tokens", 0),
+                tokens_out=brief.usage.get("output_tokens", 0),
+            )
+            analysis["slack_brief"] = brief.text
 
-        predicted = analysis.get("severity")
-        if predicted in VALID_SEVERITIES:
-            incident.severity = predicted
+            predicted = analysis.get("severity")
+            if predicted in VALID_SEVERITIES:
+                incident.severity = predicted
 
-        run.result = analysis
-        run.status = "completed"
-        run.finished_at = utcnow()
-        await db.commit()
-
+            run.result = analysis
+            run.status = "completed"
+            run.finished_at = utcnow()
+            await db.commit()
+        except Exception as exc:
+            logger.exception("triage run %s failed", run.id)
+            run.status = "failed"
+            run.error = f"{type(exc).__name__}: {exc}"
+            run.finished_at = utcnow()
+            await db.commit()
