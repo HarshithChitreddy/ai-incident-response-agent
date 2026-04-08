@@ -110,6 +110,17 @@ async def run_postmortem_for_incident(
             logger.warning("postmortem requested for unknown incident %s", incident_id)
             return
 
+        # idempotent: resolving twice must not produce two postmortems
+        existing = await db.scalar(
+            select(AgentRun).where(
+                AgentRun.incident_id == incident.id,
+                AgentRun.kind == "postmortem",
+                AgentRun.status == "completed",
+            )
+        )
+        if existing is not None:
+            return
+
         analysis = await _latest_analysis(db, incident) or {
             "root_cause": "No automated analysis was completed for this incident."
         }
