@@ -125,6 +125,14 @@ async def run_postmortem_for_incident(
             "root_cause": "No automated analysis was completed for this incident."
         }
 
+        timeline = [{"at": incident.started_at.isoformat(), "event": "alert fired, incident opened"}]
+        timeline += [
+            {"at": e.received_at.isoformat(), "event": f"alert {e.status} notification received"}
+            for e in incident.events
+        ]
+        if incident.resolved_at:
+            timeline.append({"at": incident.resolved_at.isoformat(), "event": "incident resolved"})
+
         run = AgentRun(incident_id=incident.id, kind="postmortem", model=getattr(llm, "model", ""))
         db.add(run)
         await db.commit()
@@ -132,7 +140,7 @@ async def run_postmortem_for_incident(
         tracer = AgentTracer(db, run)
 
         try:
-            resp = await generate_postmortem(llm, incident, analysis, [])
+            resp = await generate_postmortem(llm, incident, analysis, timeline)
             await tracer.record(
                 "llm_call",
                 "generate_postmortem",
