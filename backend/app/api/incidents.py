@@ -65,6 +65,23 @@ async def get_analysis(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db
     return AnalysisOut(run_id=run.id, model=run.model, finished_at=run.finished_at, analysis=run.result)
 
 
+@router.get("/{incident_id}/trace", response_model=list[TraceStepOut])
+async def get_trace(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """Step-by-step reasoning trace of the most recent triage run (any status,
+    so a failed run's partial trace is still inspectable)."""
+    stmt = (
+        select(AgentRun)
+        .options(selectinload(AgentRun.steps))
+        .where(AgentRun.incident_id == incident_id, AgentRun.kind == "triage")
+        .order_by(AgentRun.started_at.desc())
+        .limit(1)
+    )
+    run = await db.scalar(stmt)
+    if run is None:
+        raise HTTPException(status_code=404, detail="No triage run for this incident yet")
+    return run.steps
+
+
 async def _latest_run(
     db: AsyncSession, incident_id: uuid.UUID, *, kind: str, status: str
 ) -> AgentRun | None:
