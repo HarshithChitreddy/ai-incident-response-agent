@@ -57,6 +57,18 @@ async def resolve_incident(
     return incident
 
 
+@router.get("/{incident_id}/runs", response_model=list[AgentRunOut])
+async def list_agent_runs(
+    incident_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+) -> list[AgentRun]:
+    stmt = (
+        select(AgentRun)
+        .where(AgentRun.incident_id == incident_id)
+        .order_by(AgentRun.started_at.desc())
+    )
+    return list((await db.scalars(stmt)).all())
+
+
 @router.get("/{incident_id}/analysis", response_model=AnalysisOut)
 async def get_analysis(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> AnalysisOut:
     run = await _latest_run(db, incident_id, kind="triage", status="completed")
