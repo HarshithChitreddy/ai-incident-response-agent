@@ -81,3 +81,17 @@ async def test_resolve_generates_postmortem_once(client):
     runs = (await client.get(f"/api/v1/incidents/{incident_id}/runs")).json()
     postmortems = [r for r in runs if r["kind"] == "postmortem" and r["status"] == "completed"]
     assert len(postmortems) == 1
+
+
+async def test_webhook_resolved_alert_also_triggers_postmortem(client):
+    incident_id = await _create_incident(client)
+
+    resolved = make_webhook(
+        alerts=[make_alert(status="resolved", ends_at="2026-07-07T15:00:00Z")],
+        status="resolved",
+    )
+    await client.post(WEBHOOK_URL, json=resolved)
+
+    pm = await client.get(f"/api/v1/incidents/{incident_id}/postmortem")
+    assert pm.status_code == 200
+    assert "## Root Cause" in pm.json()["markdown"]
