@@ -118,3 +118,13 @@ async def test_failed_run_is_recorded_not_raised(session_factory):
         assert run.status == "failed"
         assert "simulated api outage" in run.error
         assert run.finished_at is not None
+
+
+async def test_unknown_incident_is_a_noop(session_factory):
+    import uuid
+
+    await run_triage_for_incident(uuid.uuid4(), session_factory=session_factory, llm=MockLLMClient())
+
+    async with session_factory() as db:
+        assert (await db.scalar(select(func.count()).select_from(AgentRun))) == 0
+        assert (await db.scalar(select(func.count()).select_from(TraceStep))) == 0
