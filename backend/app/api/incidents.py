@@ -55,3 +55,27 @@ async def resolve_incident(
         await db.commit()
         await db.refresh(incident)
     return incident
+
+
+@router.get("/{incident_id}/analysis", response_model=AnalysisOut)
+async def get_analysis(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> AnalysisOut:
+    run = await _latest_run(db, incident_id, kind="triage", status="completed")
+    if run is None:
+        raise HTTPException(status_code=404, detail="No completed analysis for this incident yet")
+    return AnalysisOut(run_id=run.id, model=run.model, finished_at=run.finished_at, analysis=run.result)
+
+
+async def _latest_run(
+    db: AsyncSession, incident_id: uuid.UUID, *, kind: str, status: str
+) -> AgentRun | None:
+    stmt = (
+        select(AgentRun)
+        .where(
+            AgentRun.incident_id == incident_id,
+            AgentRun.kind == kind,
+            AgentRun.status == status,
+        )
+        .order_by(AgentRun.started_at.desc())
+        .limit(1)
+    )
+    return await db.scalar(stmt)
