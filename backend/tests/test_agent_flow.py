@@ -95,3 +95,26 @@ async def test_webhook_resolved_alert_also_triggers_postmortem(client):
     pm = await client.get(f"/api/v1/incidents/{incident_id}/postmortem")
     assert pm.status_code == 200
     assert "## Root Cause" in pm.json()["markdown"]
+
+
+async def test_failed_run_is_recorded_not_raised(session_factory):
+    class ExplodingLLM(MockLLMClient):
+        async def create_message(self, **kwargs):
+            raise RuntimeError("simulated api outage")
+
+    async with session_factory() as db:
+        incident = Incident(
+            fingerprint="fp-fail", alertname="HighErrorRate", service="checkout-service",
+            severity="critical", title="boom", started_at=utcnow(),
+        )
+        db.add(incident)
+        await db.commit()
+        incident_id = incident.id
+
+    await run_triage_for_incident(incident_id, session_factory=session_factory, llm=ExplodingLLM())
+
+    async with session_factory() as db:
+        run = await db.scalar(select(AgentRun).where(AgentRun.incident_id == incident_id))
+        assert run.status == "failed"
+        assert "simulated api outage" in run.error
+        assert run.finished_at is not None
