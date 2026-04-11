@@ -94,6 +94,18 @@ async def get_trace(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return run.steps
 
 
+@router.get("/{incident_id}/postmortem", response_model=PostmortemOut)
+async def get_postmortem(
+    incident_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+) -> PostmortemOut:
+    run = await _latest_run(db, incident_id, kind="postmortem", status="completed")
+    if run is None:
+        raise HTTPException(status_code=404, detail="No postmortem for this incident yet")
+    return PostmortemOut(
+        run_id=run.id, finished_at=run.finished_at, markdown=run.result.get("markdown", "")
+    )
+
+
 async def _latest_run(
     db: AsyncSession, incident_id: uuid.UUID, *, kind: str, status: str
 ) -> AgentRun | None:
