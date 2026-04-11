@@ -43,9 +43,12 @@ async def get_incident(incident_id: uuid.UUID, db: AsyncSession = Depends(get_db
 @router.post("/{incident_id}/resolve", response_model=IncidentOut)
 async def resolve_incident(
     incident_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    session_factory: async_sessionmaker = Depends(get_session_factory),
 ) -> Incident:
-    """Manually resolve an incident."""
+    """Manually resolve an incident and generate its postmortem. Idempotent —
+    the postmortem runner skips if one already exists."""
     incident = await db.get(Incident, incident_id)
     if incident is None:
         raise HTTPException(status_code=404, detail="Incident not found")
@@ -54,6 +57,7 @@ async def resolve_incident(
         incident.resolved_at = utcnow()
         await db.commit()
         await db.refresh(incident)
+    background_tasks.add_task(run_postmortem_for_incident, incident.id, session_factory)
     return incident
 
 
