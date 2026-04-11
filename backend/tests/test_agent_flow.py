@@ -66,3 +66,18 @@ async def test_trace_records_every_llm_and_tool_step(client):
     # tool inputs/outputs are stored verbatim for the dashboard
     commits_step = next(s for s in steps if s["name"] == "get_recent_commits")
     assert commits_step["input"]["service"] == "checkout-service"
+
+
+async def test_resolve_generates_postmortem_once(client):
+    incident_id = await _create_incident(client)
+
+    await client.post(f"/api/v1/incidents/{incident_id}/resolve")
+    pm = await client.get(f"/api/v1/incidents/{incident_id}/postmortem")
+    assert pm.status_code == 200
+    assert pm.json()["markdown"].startswith("# Postmortem")
+
+    # resolving again must not create a second postmortem
+    await client.post(f"/api/v1/incidents/{incident_id}/resolve")
+    runs = (await client.get(f"/api/v1/incidents/{incident_id}/runs")).json()
+    postmortems = [r for r in runs if r["kind"] == "postmortem" and r["status"] == "completed"]
+    assert len(postmortems) == 1
