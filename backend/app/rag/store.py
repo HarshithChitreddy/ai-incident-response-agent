@@ -63,6 +63,26 @@ class RunbookIndex:
             path=str(self.persist_dir),
             settings=chromadb.Settings(anonymized_telemetry=False),
         )
-        collection = client.get_or_create_collection(COLLECTION, metadata={"hnsw:space": "cosine"})
+        fingerprint = self._fingerprint()
+        try:
+            existing = client.get_collection(COLLECTION)
+            if (existing.metadata or {}).get("fingerprint") == fingerprint and existing.count():
+                self._collection = existing
+                return existing
+            client.delete_collection(COLLECTION)
+        except Exception:
+            # collection doesn't exist yet — the raised type varies across chroma versions
+            pass
+
+        collection = client.create_collection(
+            COLLECTION, metadata={"hnsw:space": "cosine", "fingerprint": fingerprint}
+        )
         self._collection = collection
         return collection
+
+    def _fingerprint(self) -> str:
+        digest = hashlib.sha256()
+        for path in sorted(self.runbooks_dir.glob("*.md")):
+            digest.update(path.name.encode())
+            digest.update(path.read_bytes())
+        return digest.hexdigest()
