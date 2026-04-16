@@ -77,6 +77,20 @@ class RunbookIndex:
         collection = client.create_collection(
             COLLECTION, metadata={"hnsw:space": "cosine", "fingerprint": fingerprint}
         )
+        splitter = MarkdownHeaderTextSplitter(headers_to_split_on=_HEADERS)
+        ids: list[str] = []
+        documents: list[str] = []
+        metadatas: list[dict] = []
+        for path in sorted(self.runbooks_dir.glob("*.md")):
+            for i, doc in enumerate(splitter.split_text(path.read_text())):
+                title = doc.metadata.get("title", path.stem)
+                section = doc.metadata.get("section", "")
+                ids.append(f"{path.name}#{i}")
+                # headers prepended so section context shapes the embedding
+                documents.append(f"{title}\n{section}\n{doc.page_content}")
+                metadatas.append({"source": path.name, "title": title, "section": section})
+
+        collection.add(ids=ids, documents=documents, metadatas=metadatas)
         self._collection = collection
         return collection
 
