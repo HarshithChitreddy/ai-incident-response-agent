@@ -127,3 +127,7 @@ class RunbookIndex:
                 result["documents"][0], result["metadatas"][0], result["distances"][0]
             )
         ]
+
+    async def search(self, query: str, k: int = 4) -> list[RunbookChunk]:
+        # chroma + onnx inference are sync and CPU-bound; keep them off the event loop
+        return await asyncio.to_thread(self.search_sync, query, k)
