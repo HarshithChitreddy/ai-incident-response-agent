@@ -100,3 +100,30 @@ class RunbookIndex:
             digest.update(path.name.encode())
             digest.update(path.read_bytes())
         return digest.hexdigest()
+
+    # -- retrieval ----------------------------------------------------------
+
+    def search_sync(self, query: str, k: int = 4) -> list[RunbookChunk]:
+        with self._lock:
+            collection = self._ensure_locked()
+            n = min(k, collection.count())
+            if n == 0:
+                return []
+            result = collection.query(
+                query_texts=[query],
+                n_results=n,
+                include=["documents", "metadatas", "distances"],
+            )
+
+        return [
+            RunbookChunk(
+                source=meta["source"],
+                title=meta.get("title", ""),
+                section=meta.get("section", ""),
+                content=doc,
+                score=round(1 - dist, 4),
+            )
+            for doc, meta, dist in zip(
+                result["documents"][0], result["metadatas"][0], result["distances"][0]
+            )
+        ]
