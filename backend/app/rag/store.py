@@ -131,3 +131,12 @@ class RunbookIndex:
     async def search(self, query: str, k: int = 4) -> list[RunbookChunk]:
         # chroma + onnx inference are sync and CPU-bound; keep them off the event loop
         return await asyncio.to_thread(self.search_sync, query, k)
+
+
+@lru_cache
+def get_runbook_index() -> RunbookIndex:
+    settings = get_settings()
+    return RunbookIndex(
+        persist_dir=settings.chroma_persist_dir,
+        runbooks_dir=Path(settings.data_dir) / "runbooks",
+    )
