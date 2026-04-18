@@ -111,6 +111,29 @@ async def retrieve_runbook(ctx: ToolContext, query: str) -> dict:
     }
 
 
+async def _keyword_retrieve_runbook(ctx: ToolContext, query: str) -> dict:
+    """Phase 2 keyword matcher, kept as the degraded-mode path."""
+    query_tokens = _tokens(query)
+    best_name, best_score, best_content = None, -1.0, ""
+
+    for path in sorted((ctx.settings.data_dir / "runbooks").glob("*.md")):
+        content = path.read_text()
+        title = content.splitlines()[0] if content else ""
+        # title matches count 3x — the title names the alert class
+        score = 3 * len(query_tokens & _tokens(title + " " + path.stem)) + len(
+            query_tokens & _tokens(content)
+        )
+        if score > best_score:
+            best_name, best_score, best_content = path.name, score, content
+
+    return {
+        "runbook": best_name,
+        "match_score": best_score,
+        "retriever": "keyword-fallback",
+        "content": best_content,
+    }
+
+
 async def find_similar_incidents(
     ctx: ToolContext,
     service: str,
