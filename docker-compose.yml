@@ -20,9 +20,15 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://incident:incident@db:5432/incident_response
       DATA_DIR: /app/data
+      CHROMA_PERSIST_DIR: /app/chroma_data
+      MOCK_LLM: ${MOCK_LLM:-true}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-4-8}
     volumes:
       - ./data:/app/data:ro
       - ./backend/app:/app/app # dev hot-reload; drop for a production image
+      - chroma_data:/app/chroma_data
+      - onnx_cache:/root/.cache/chroma # embedding model survives container rebuilds
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
@@ -32,3 +38,5 @@ services:
 
 volumes:
   pgdata:
+  chroma_data:
+  onnx_cache:
