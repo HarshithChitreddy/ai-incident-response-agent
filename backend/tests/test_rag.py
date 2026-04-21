@@ -59,3 +59,11 @@ async def test_retrieval_from_alert_plus_raw_log_lines(runbook_index):
     )
     chunks = await runbook_index.search(query, k=3)
     assert chunks[0].source == "high-error-rate.md"
+
+
+async def test_scores_are_bounded_and_descending(runbook_index):
+    chunks = await runbook_index.search("database connection pool exhausted", k=4)
+    scores = [c.score for c in chunks]
+    assert all(s <= 1.0 for s in scores)
+    assert scores == sorted(scores, reverse=True)
+    assert all(c.section for c in chunks)  # section metadata survives round-trip
