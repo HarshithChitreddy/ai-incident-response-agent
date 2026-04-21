@@ -47,3 +47,15 @@ async def test_top_hit_matches_alert_class(runbook_index, query, expected):
     assert chunks[0].source == expected, (
         f"expected {expected}, got {[c.source for c in chunks]}"
     )
+
+
+async def test_retrieval_from_alert_plus_raw_log_lines(runbook_index):
+    """The agent builds queries from the alert plus log excerpts — retrieval
+    must survive that noisier input."""
+    query = (
+        "HighErrorRate on checkout-service. Logs: "
+        "PaymentGatewayTimeout: authorize() exceeded 2000ms deadline (attempt 3/3), giving up; "
+        "POST /api/checkout/confirm -> 502 payment authorization failed after retries"
+    )
+    chunks = await runbook_index.search(query, k=3)
+    assert chunks[0].source == "high-error-rate.md"
