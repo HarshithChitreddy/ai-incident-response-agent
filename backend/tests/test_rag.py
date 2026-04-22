@@ -119,3 +119,16 @@ async def test_tool_uses_semantic_retriever(session_factory, runbook_index):
     assert result["runbook"] == "high-error-rate.md"
     assert result["matched_sections"]
     assert result["content"].startswith("# Runbook: High Error Rate")
+
+
+async def test_tool_falls_back_to_keyword_matching(session_factory):
+    class ExplodingIndex:
+        async def search(self, query, k=4):
+            raise RuntimeError("vector store offline")
+
+    async with session_factory() as db:
+        ctx = ToolContext(db=db, settings=get_settings(), runbook_index=ExplodingIndex())
+        result = await retrieve_runbook(ctx, query="HighErrorRate 5xx payment timeouts")
+
+    assert result["retriever"] == "keyword-fallback"
+    assert result["runbook"] == "high-error-rate.md"
