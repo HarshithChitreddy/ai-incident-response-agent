@@ -67,3 +67,21 @@ async def test_scores_are_bounded_and_descending(runbook_index):
     assert all(s <= 1.0 for s in scores)
     assert scores == sorted(scores, reverse=True)
     assert all(c.section for c in chunks)  # section metadata survives round-trip
+
+
+async def test_persisted_index_is_reused_across_instances(tmp_path):
+    runbooks = tmp_path / "runbooks"
+    runbooks.mkdir()
+    (runbooks / "disk.md").write_text(
+        "# Disk Full Runbook\n## Symptoms\nDisk usage above 95 percent, writes failing."
+    )
+    persist = tmp_path / "chroma"
+
+    first = RunbookIndex(persist_dir=persist, runbooks_dir=runbooks)
+    first.ensure_indexed()
+
+    second = RunbookIndex(persist_dir=persist, runbooks_dir=runbooks)
+    second.ensure_indexed()
+
+    # same collection id means the fingerprint matched and no rebuild happened
+    assert second.collection_id == first.collection_id
