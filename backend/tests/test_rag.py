@@ -106,3 +106,16 @@ async def test_index_rebuilds_when_runbooks_change(tmp_path):
 
     assert second.collection_id != first.collection_id  # fingerprint mismatch -> rebuild
     assert hits[0].source == "network.md"
+
+
+async def test_tool_uses_semantic_retriever(session_factory, runbook_index):
+    async with session_factory() as db:
+        ctx = ToolContext(db=db, settings=get_settings(), runbook_index=runbook_index)
+        result = await retrieve_runbook(
+            ctx, query="HighErrorRate 5xx payment authorization timeout retry storm"
+        )
+
+    assert result["retriever"] == "chroma/all-MiniLM-L6-v2"
+    assert result["runbook"] == "high-error-rate.md"
+    assert result["matched_sections"]
+    assert result["content"].startswith("# Runbook: High Error Rate")
