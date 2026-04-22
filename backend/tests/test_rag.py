@@ -85,3 +85,24 @@ async def test_persisted_index_is_reused_across_instances(tmp_path):
 
     # same collection id means the fingerprint matched and no rebuild happened
     assert second.collection_id == first.collection_id
+
+
+async def test_index_rebuilds_when_runbooks_change(tmp_path):
+    runbooks = tmp_path / "runbooks"
+    runbooks.mkdir()
+    (runbooks / "disk.md").write_text(
+        "# Disk Full Runbook\n## Symptoms\nDisk usage above 95 percent, writes failing."
+    )
+    persist = tmp_path / "chroma"
+
+    first = RunbookIndex(persist_dir=persist, runbooks_dir=runbooks)
+    first.ensure_indexed()
+
+    (runbooks / "network.md").write_text(
+        "# Network Runbook\n## Symptoms\nPacket loss and TCP retransmits between pods."
+    )
+    second = RunbookIndex(persist_dir=persist, runbooks_dir=runbooks)
+    hits = await second.search("packet loss retransmits between pods", k=2)
+
+    assert second.collection_id != first.collection_id  # fingerprint mismatch -> rebuild
+    assert hits[0].source == "network.md"
