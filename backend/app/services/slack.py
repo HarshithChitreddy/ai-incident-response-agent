@@ -42,6 +42,12 @@ def _mrkdwn(text: str, limit: int = _SECTION_MAX) -> dict[str, Any]:
     return {"type": "mrkdwn", "text": _clip(text, limit)}
 
 
+def _fmt_duration(start: datetime, end: datetime) -> str:
+    minutes = max(0, int((end - start).total_seconds() // 60))
+    hours, mins = divmod(minutes, 60)
+    return f"{hours}h {mins}m" if hours else f"{mins}m"
+
+
 def build_incident_opened_message(incident: Incident, analysis: dict[str, Any]) -> dict[str, Any]:
     severity = str(analysis.get("severity") or incident.severity or "warning")
     emoji = SEVERITY_EMOJI.get(severity, ":warning:")
@@ -95,4 +101,44 @@ def build_incident_opened_message(incident: Incident, analysis: dict[str, Any]) 
     fallback = _clip(
         f"[{severity.upper()}] {incident.alertname} on {incident.service}: {root_cause}", 300
     )
+    return {"channel": "#incidents", "text": fallback, "blocks": blocks}
+
+
+def build_incident_resolved_message(
+    incident: Incident, postmortem_ready: bool = False
+) -> dict[str, Any]:
+    resolved_at = incident.resolved_at or incident.started_at
+    duration = _fmt_duration(incident.started_at, resolved_at)
+
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": _clip(f":white_check_mark: Resolved: {incident.alertname} — {incident.service}", _HEADER_MAX),
+                "emoji": True,
+            },
+        },
+        {
+            "type": "section",
+            "text": _mrkdwn(
+                f"*{incident.title}* is resolved.\n"
+                f"*Duration:* {duration} · *Severity:* {incident.severity}"
+            ),
+        },
+    ]
+    if postmortem_ready:
+        blocks.append(
+            {
+                "type": "context",
+                "elements": [
+                    _mrkdwn(
+                        f"Postmortem ready: `GET /api/v1/incidents/{incident.id}/postmortem`",
+                        _CONTEXT_MAX,
+                    )
+                ],
+            }
+        )
+
+    fallback = f"Resolved: {incident.alertname} on {incident.service} after {duration}"
     return {"channel": "#incidents", "text": fallback, "blocks": blocks}
