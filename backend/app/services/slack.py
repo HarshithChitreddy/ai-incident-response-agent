@@ -156,16 +156,31 @@ class SlackService:
         self._client = client  # injectable for tests (httpx.MockTransport)
 
     async def post(self, incident_id, kind: str, message: dict[str, Any]) -> SlackMessage:
+        webhook_url = self._settings.slack_webhook_url
         row = SlackMessage(
             incident_id=incident_id,
             kind=kind,
             channel=message["channel"],
             text=message["text"],
             blocks=message["blocks"],
-            transport="mock",
-            delivered=True,
+            transport="slack_webhook" if webhook_url else "mock",
+            delivered=not webhook_url,  # mock mode: stored == delivered
         )
+
+        if webhook_url:
+            await self._deliver(webhook_url, message)
+            row.delivered = True
+
         self._db.add(row)
         await self._db.commit()
         await self._db.refresh(row)
         return row
+
+    async def _deliver(self, url: str, message: dict[str, Any]) -> None:
+        payload = {"text": message["text"], "blocks": message["blocks"]}
+        if self._client is not None:
+            resp = await self._client.post(url, json=payload)
+        else:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(url, json=payload)
+        resp.raise_for_status()
