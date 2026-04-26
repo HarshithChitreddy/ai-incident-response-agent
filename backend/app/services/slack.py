@@ -142,3 +142,30 @@ def build_incident_resolved_message(
 
     fallback = f"Resolved: {incident.alertname} on {incident.service} after {duration}"
     return {"channel": "#incidents", "text": fallback, "blocks": blocks}
+
+
+class SlackService:
+    def __init__(
+        self,
+        db: AsyncSession,
+        settings: Settings,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
+        self._db = db
+        self._settings = settings
+        self._client = client  # injectable for tests (httpx.MockTransport)
+
+    async def post(self, incident_id, kind: str, message: dict[str, Any]) -> SlackMessage:
+        row = SlackMessage(
+            incident_id=incident_id,
+            kind=kind,
+            channel=message["channel"],
+            text=message["text"],
+            blocks=message["blocks"],
+            transport="mock",
+            delivered=True,
+        )
+        self._db.add(row)
+        await self._db.commit()
+        await self._db.refresh(row)
+        return row
