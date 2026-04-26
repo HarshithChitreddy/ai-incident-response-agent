@@ -168,8 +168,13 @@ class SlackService:
         )
 
         if webhook_url:
-            await self._deliver(webhook_url, message)
-            row.delivered = True
+            try:
+                await self._deliver(webhook_url, message)
+                row.delivered = True
+            except Exception as exc:
+                row.delivered = False
+                row.delivery_error = f"{type(exc).__name__}: {exc}"
+                logger.warning("slack delivery failed for incident %s: %s", incident_id, exc)
 
         self._db.add(row)
         await self._db.commit()
