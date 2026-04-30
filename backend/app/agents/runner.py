@@ -86,6 +86,17 @@ async def run_triage_for_incident(
             message = await slack.post(
                 incident.id, "incident_opened", build_incident_opened_message(incident, analysis)
             )
+            await tracer.record(
+                "notification",
+                "post_slack_message",
+                {"kind": "incident_opened", "channel": message.channel},
+                {
+                    "transport": message.transport,
+                    "delivered": message.delivered,
+                    "message_id": str(message.id),
+                },
+            )
+
             run.result = analysis
             run.status = "completed"
             run.finished_at = utcnow()
