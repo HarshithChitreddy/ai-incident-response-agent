@@ -153,6 +153,23 @@ async def run_postmortem_for_incident(
                 tokens_in=resp.usage.get("input_tokens", 0),
                 tokens_out=resp.usage.get("output_tokens", 0),
             )
+            slack = SlackService(db, get_settings())
+            message = await slack.post(
+                incident.id,
+                "incident_resolved",
+                build_incident_resolved_message(incident, postmortem_ready=True),
+            )
+            await tracer.record(
+                "notification",
+                "post_slack_message",
+                {"kind": "incident_resolved", "channel": message.channel},
+                {
+                    "transport": message.transport,
+                    "delivered": message.delivered,
+                    "message_id": str(message.id),
+                },
+            )
+
             run.result = {"markdown": resp.text}
             run.status = "completed"
             run.finished_at = utcnow()
