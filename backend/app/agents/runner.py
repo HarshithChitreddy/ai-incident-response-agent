@@ -82,6 +82,10 @@ async def run_triage_for_incident(
             if predicted in VALID_SEVERITIES:
                 incident.severity = predicted
 
+            slack = SlackService(db, settings)
+            message = await slack.post(
+                incident.id, "incident_opened", build_incident_opened_message(incident, analysis)
+            )
             run.result = analysis
             run.status = "completed"
             run.finished_at = utcnow()
