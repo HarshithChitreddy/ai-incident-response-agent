@@ -110,6 +110,20 @@ async def get_postmortem(
     )
 
 
+@router.get("/{incident_id}/slack", response_model=list[SlackMessageOut])
+async def list_slack_messages(
+    incident_id: uuid.UUID, db: AsyncSession = Depends(get_db)
+) -> list[SlackMessage]:
+    """The incident's Slack feed — every message posted (or stored in mock
+    mode), oldest first, exactly as the channel would show them."""
+    stmt = (
+        select(SlackMessage)
+        .where(SlackMessage.incident_id == incident_id)
+        .order_by(SlackMessage.created_at)
+    )
+    return list((await db.scalars(stmt)).all())
+
+
 async def _latest_run(
     db: AsyncSession, incident_id: uuid.UUID, *, kind: str, status: str
 ) -> AgentRun | None:
