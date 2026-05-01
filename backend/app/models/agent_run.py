@@ -24,8 +24,8 @@ class AgentRun(Base):
     model: Mapped[str] = mapped_column(String(128), default="")
     result: Mapped[dict] = mapped_column(JSONVariant, default=dict)
     error: Mapped[str] = mapped_column(Text, default="")
-    started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     steps: Mapped[list["TraceStep"]] = relationship(
         back_populates="run",
@@ -51,6 +51,6 @@ class TraceStep(Base):
     output: Mapped[dict] = mapped_column(JSONVariant, default=dict)
     tokens_in: Mapped[int] = mapped_column(default=0)
     tokens_out: Mapped[int] = mapped_column(default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     run: Mapped[AgentRun] = relationship(back_populates="steps")
