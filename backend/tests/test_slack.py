@@ -135,3 +135,30 @@ def test_resolved_message_reports_duration_and_postmortem():
     assert "*Duration:* 1h 12m" in body
     assert "postmortem" in body.lower()
     assert "1h 12m" in msg["text"]
+
+
+# --------------------------------------------------------------------------- #
+# Delivery
+# --------------------------------------------------------------------------- #
+
+
+async def _persisted_incident(session_factory) -> Incident:
+    async with session_factory() as db:
+        incident = make_incident()
+        db.add(incident)
+        await db.commit()
+        await db.refresh(incident)
+        return incident
+
+
+async def test_mock_transport_stores_message(session_factory):
+    incident = await _persisted_incident(session_factory)
+    async with session_factory() as db:
+        service = SlackService(db, Settings(_env_file=None))  # no webhook URL
+        row = await service.post(
+            incident.id, "incident_opened", build_incident_opened_message(incident, ANALYSIS)
+        )
+
+    assert row.transport == "mock"
+    assert row.delivered is True
+    assert row.blocks[0]["type"] == "header"  # blocks survive the JSON round-trip
