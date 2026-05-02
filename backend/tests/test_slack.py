@@ -162,3 +162,27 @@ async def test_mock_transport_stores_message(session_factory):
     assert row.transport == "mock"
     assert row.delivered is True
     assert row.blocks[0]["type"] == "header"  # blocks survive the JSON round-trip
+
+
+async def test_webhook_transport_delivers(session_factory):
+    incident = await _persisted_incident(session_factory)
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json
+
+        seen["payload"] = json.loads(request.content)
+        return httpx.Response(200, text="ok")
+
+    settings = Settings(_env_file=None, slack_webhook_url="https://hooks.slack.example/services/T/B/x")
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    async with session_factory() as db:
+        service = SlackService(db, settings, client=client)
+        row = await service.post(
+            incident.id, "incident_opened", build_incident_opened_message(incident, ANALYSIS)
+        )
+
+    assert row.transport == "slack_webhook"
+    assert row.delivered is True
+    assert seen["payload"]["blocks"][0]["type"] == "header"
+    assert seen["payload"]["text"]
