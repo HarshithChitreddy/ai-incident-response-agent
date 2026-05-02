@@ -122,3 +122,16 @@ def test_long_root_cause_is_truncated_to_slack_limit():
     text = cause_block["text"]["text"]
     assert len(text) <= 3000
     assert text.endswith("…")
+
+
+def test_resolved_message_reports_duration_and_postmortem():
+    incident = make_incident(
+        status="resolved", resolved_at=STARTED + timedelta(minutes=72)
+    )
+    msg = build_incident_resolved_message(incident, postmortem_ready=True)
+
+    assert ":white_check_mark:" in msg["blocks"][0]["text"]["text"]
+    body = _sections_text(msg)
+    assert "*Duration:* 1h 12m" in body
+    assert "postmortem" in body.lower()
+    assert "1h 12m" in msg["text"]
