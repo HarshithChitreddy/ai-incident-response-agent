@@ -99,3 +99,14 @@ def test_opened_message_limits_steps_to_three_bullets():
     bullets = [line for line in steps_block["text"]["text"].splitlines() if line.startswith("•")]
     assert len(bullets) == 3
     assert "fourth step" not in steps_block["text"]["text"]
+
+
+def test_opened_message_survives_empty_analysis():
+    msg = build_incident_opened_message(make_incident(), {})
+
+    assert msg["blocks"][0]["type"] == "header"
+    assert "Investigation in progress." in _sections_text(msg)
+    fields = "\n".join(f["text"] for f in msg["blocks"][1]["fields"])
+    assert "*Confidence:*\nn/a" in fields
+    # no impact/steps blocks, and nothing crashed
+    assert all("Next steps" not in str(b) for b in msg["blocks"])
