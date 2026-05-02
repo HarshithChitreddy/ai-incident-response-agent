@@ -110,3 +110,15 @@ def test_opened_message_survives_empty_analysis():
     assert "*Confidence:*\nn/a" in fields
     # no impact/steps blocks, and nothing crashed
     assert all("Next steps" not in str(b) for b in msg["blocks"])
+
+
+def test_long_root_cause_is_truncated_to_slack_limit():
+    huge = {"root_cause": "x" * 5000, "severity": "critical"}
+    msg = build_incident_opened_message(make_incident(), huge)
+    cause_block = next(
+        b for b in msg["blocks"]
+        if b["type"] == "section" and "Likely cause" in b.get("text", {}).get("text", "")
+    )
+    text = cause_block["text"]["text"]
+    assert len(text) <= 3000
+    assert text.endswith("…")
