@@ -186,3 +186,23 @@ async def test_webhook_transport_delivers(session_factory):
     assert row.delivered is True
     assert seen["payload"]["blocks"][0]["type"] == "header"
     assert seen["payload"]["text"]
+
+
+async def test_webhook_failure_is_recorded_not_raised(session_factory):
+    incident = await _persisted_incident(session_factory)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="upstream sad")
+
+    settings = Settings(_env_file=None, slack_webhook_url="https://hooks.slack.example/services/T/B/x")
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    async with session_factory() as db:
+        service = SlackService(db, settings, client=client)
+        row = await service.post(
+            incident.id, "incident_opened", build_incident_opened_message(incident, ANALYSIS)
+        )
+
+    assert row.delivered is False
+    assert "500" in row.delivery_error
+    # the message is still stored for the dashboard despite failed delivery
+    assert row.blocks
