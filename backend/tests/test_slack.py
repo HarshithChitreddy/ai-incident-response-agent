@@ -88,3 +88,14 @@ def test_opened_message_structure():
     # notification fallback text carries the essentials
     assert "HighErrorRate" in msg["text"]
     assert "checkout-service" in msg["text"]
+
+
+def test_opened_message_limits_steps_to_three_bullets():
+    msg = build_incident_opened_message(make_incident(), ANALYSIS)
+    steps_block = next(
+        b for b in msg["blocks"]
+        if b["type"] == "section" and "Next steps" in b.get("text", {}).get("text", "")
+    )
+    bullets = [line for line in steps_block["text"]["text"].splitlines() if line.startswith("•")]
+    assert len(bullets) == 3
+    assert "fourth step" not in steps_block["text"]["text"]
