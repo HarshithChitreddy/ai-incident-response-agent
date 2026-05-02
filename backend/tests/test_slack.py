@@ -206,3 +206,27 @@ async def test_webhook_failure_is_recorded_not_raised(session_factory):
     assert "500" in row.delivery_error
     # the message is still stored for the dashboard despite failed delivery
     assert row.blocks
+
+
+# --------------------------------------------------------------------------- #
+# End-to-end feed
+# --------------------------------------------------------------------------- #
+
+
+async def test_incident_lifecycle_posts_opened_then_resolved(client):
+    created = (await client.post(WEBHOOK_URL, json=make_webhook())).json()["created"]
+    incident_id = created[0]
+
+    feed = (await client.get(f"/api/v1/incidents/{incident_id}/slack")).json()
+    assert [m["kind"] for m in feed] == ["incident_opened"]
+    assert feed[0]["transport"] == "mock"
+    assert "HighErrorRate" in feed[0]["blocks"][0]["text"]["text"]
+
+    await client.post(f"/api/v1/incidents/{incident_id}/resolve")
+    feed = (await client.get(f"/api/v1/incidents/{incident_id}/slack")).json()
+    assert [m["kind"] for m in feed] == ["incident_opened", "incident_resolved"]
+    assert "Resolved" in feed[1]["blocks"][0]["text"]["text"]
+
+    # the notification itself appears in the agent trace
+    steps = (await client.get(f"/api/v1/incidents/{incident_id}/trace")).json()
+    assert any(s["step_type"] == "notification" for s in steps)
