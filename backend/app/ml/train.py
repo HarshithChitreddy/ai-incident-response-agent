@@ -96,3 +96,25 @@ def generate_training_frame(rows: int = 600, seed: int = 7) -> pd.DataFrame:
     df["severity"] = pd.qcut(df["_score"], q=[0, 0.40, 0.65, 0.85, 1.0], labels=SEVERITIES)
     df["severity"] = df["severity"].astype(str)
     return df.drop(columns=["_score"])
+
+
+def train(rows: int = 1500, model_dir: Path | str | None = None, seed: int = 7) -> dict:
+    model_dir = Path(model_dir or get_settings().model_dir)
+    df = generate_training_frame(rows=rows, seed=seed)
+
+    X, y = df[FEATURES], df["severity"]
+
+    pipeline = Pipeline(
+        [
+            (
+                "prep",
+                ColumnTransformer(
+                    [("alert", OneHotEncoder(sparse_output=False, handle_unknown="ignore"), ["alertname"])],
+                    remainder="passthrough",
+                ),
+            ),
+            ("clf", HistGradientBoostingClassifier(max_iter=300, random_state=seed)),
+        ]
+    )
+    pipeline.fit(X, y)
+    return pipeline
