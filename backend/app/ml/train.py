@@ -66,6 +66,18 @@ def generate_training_frame(rows: int = 600, seed: int = 7) -> pd.DataFrame:
         error_rate = float(np.clip(error_rate, 0, 25))
         latency = float(np.clip(latency, 50, 12000))
 
+        # continuous latent risk score (how an SRE weighs the signals) plus a
+        # little label noise — keeps the mapping learnable but imperfect, so
+        # test accuracy stays honest instead of a meaningless 100%
+        score = (
+            0.30 * error_rate
+            + 0.9 * float(np.log1p(latency / 300))
+            + 0.05 * max(0.0, memory - 78)
+            + 1.1 * deploy
+            + 0.01 * max(0.0, cpu - 70)
+            + float(rng.normal(0, 0.10))
+        )
+
         records.append(
             {
                 "alertname": alertname,
@@ -75,7 +87,12 @@ def generate_training_frame(rows: int = 600, seed: int = 7) -> pd.DataFrame:
                 "cpu_pct": round(cpu, 1),
                 "memory_pct": round(memory, 1),
                 "deploy_within_hour": int(deploy),
+                "_score": score,
             }
         )
 
-    return pd.DataFrame.from_records(records)
+    df = pd.DataFrame.from_records(records)
+    # quantile boundaries -> balanced classes: 40% low, 25% medium, 20% high, 15% critical
+    df["severity"] = pd.qcut(df["_score"], q=[0, 0.40, 0.65, 0.85, 1.0], labels=SEVERITIES)
+    df["severity"] = df["severity"].astype(str)
+    return df.drop(columns=["_score"])
