@@ -160,3 +160,23 @@ def train(rows: int = 1500, model_dir: Path | str | None = None, seed: int = 7) 
     joblib.dump(bundle, model_dir / MODEL_FILE)
     (model_dir / METRICS_FILE).write_text(json.dumps(metrics, indent=2))
     return metrics
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--rows", type=int, default=1500)
+    parser.add_argument("--out", default=None, help="artifact dir (default: MODEL_DIR)")
+    parser.add_argument("--seed", type=int, default=7)
+    args = parser.parse_args()
+
+    metrics = train(rows=args.rows, model_dir=args.out, seed=args.seed)
+    print(f"accuracy={metrics['accuracy']}  f1_macro={metrics['f1_macro']}  (n_test={metrics['n_test']})")
+    print(f"{'':>10}" + "".join(f"{label:>10}" for label in SEVERITIES) + "   (predicted)")
+    for label, row in zip(SEVERITIES, metrics["confusion_matrix"]):
+        print(f"{label:>10}" + "".join(f"{v:>10}" for v in row))
+    for label, stats in metrics["per_class"].items():
+        print(f"{label:>10}  precision={stats['precision']:.2f}  recall={stats['recall']:.2f}  f1={stats['f1']:.2f}  n={stats['support']}")
+
+
+if __name__ == "__main__":
+    main()
