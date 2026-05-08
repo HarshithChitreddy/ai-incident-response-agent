@@ -146,4 +146,17 @@ def train(rows: int = 1500, model_dir: Path | str | None = None, seed: int = 7) 
         },
         "confusion_matrix": confusion_matrix(y_test, y_pred, labels=SEVERITIES).tolist(),
     }
+
+    bundle = {
+        "version": 1,
+        "pipeline": pipeline,
+        "classes": list(pipeline.named_steps["clf"].classes_),
+        "features": FEATURES,
+        "feature_medians": {f: float(X_train[f].median()) for f in NUMERIC_FEATURES},
+        "metrics": metrics,
+    }
+
+    model_dir.mkdir(parents=True, exist_ok=True)
+    joblib.dump(bundle, model_dir / MODEL_FILE)
+    (model_dir / METRICS_FILE).write_text(json.dumps(metrics, indent=2))
     return metrics
