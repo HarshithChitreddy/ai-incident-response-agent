@@ -121,4 +121,29 @@ def train(rows: int = 1500, model_dir: Path | str | None = None, seed: int = 7) 
     )
     pipeline.fit(X_train, y_train)
     y_pred = pipeline.predict(X_test)
-    return pipeline
+
+    precision, recall, f1, support = precision_recall_fscore_support(
+        y_test, y_pred, labels=SEVERITIES, zero_division=0
+    )
+    metrics = {
+        "model": "HistGradientBoostingClassifier",
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "rows": rows,
+        "n_train": len(X_train),
+        "n_test": len(X_test),
+        "features": FEATURES,
+        "labels": SEVERITIES,
+        "accuracy": round(float(accuracy_score(y_test, y_pred)), 4),
+        "f1_macro": round(float(f1_score(y_test, y_pred, average="macro")), 4),
+        "per_class": {
+            label: {
+                "precision": round(float(p), 4),
+                "recall": round(float(r), 4),
+                "f1": round(float(f), 4),
+                "support": int(s),
+            }
+            for label, p, r, f, s in zip(SEVERITIES, precision, recall, f1, support)
+        },
+        "confusion_matrix": confusion_matrix(y_test, y_pred, labels=SEVERITIES).tolist(),
+    }
+    return metrics
