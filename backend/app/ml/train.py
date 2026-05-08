@@ -103,6 +103,9 @@ def train(rows: int = 1500, model_dir: Path | str | None = None, seed: int = 7) 
     df = generate_training_frame(rows=rows, seed=seed)
 
     X, y = df[FEATURES], df["severity"]
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.25, random_state=seed, stratify=y
+    )
 
     pipeline = Pipeline(
         [
@@ -116,5 +119,6 @@ def train(rows: int = 1500, model_dir: Path | str | None = None, seed: int = 7) 
             ("clf", HistGradientBoostingClassifier(max_iter=300, random_state=seed)),
         ]
     )
-    pipeline.fit(X, y)
+    pipeline.fit(X_train, y_train)
+    y_pred = pipeline.predict(X_test)
     return pipeline
