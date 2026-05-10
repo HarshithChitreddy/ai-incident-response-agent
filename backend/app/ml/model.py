@@ -53,3 +53,13 @@ class SeverityModel:
             "method": "ml/hist-gradient-boosting-v1",
             "model_test_accuracy": self.metrics.get("accuracy"),
         }
+
+
+@lru_cache
+def get_severity_model() -> SeverityModel | None:
+    """None when no artifact has been trained — callers fall back to the
+    heuristic. Cached for the process lifetime; train before starting the app."""
+    path = Path(get_settings().model_dir) / MODEL_FILE
+    if not path.exists():
+        return None
+    return SeverityModel.load(path)
