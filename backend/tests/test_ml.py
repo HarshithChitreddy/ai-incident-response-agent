@@ -13,9 +13,29 @@ from app.tools.base import ToolContext
 from app.tools.heuristics import predict_severity
 
 
+@pytest.fixture(scope="module")
+def trained_dir(tmp_path_factory):
+    out = tmp_path_factory.mktemp("model")
+    metrics = train(rows=1500, model_dir=out, seed=7)
+    return out, metrics
+
+
 def test_generated_frame_is_learnable():
     df = generate_training_frame(rows=300, seed=1)
     assert set(df["severity"].unique()) <= set(SEVERITIES)
     assert df["severity"].nunique() == 4  # all classes represented
     assert df["alertname"].nunique() == 4
     assert (df["error_rate_pct"] >= 0).all()
+
+
+def test_train_saves_model_and_honest_metrics(trained_dir):
+    out, metrics = trained_dir
+    assert (out / MODEL_FILE).exists()
+    assert (out / "metrics.json").exists()
+
+    assert 0.75 <= metrics["accuracy"] < 1.0  # noisy labels: good but not perfect
+    assert metrics["f1_macro"] >= 0.65
+    cm = metrics["confusion_matrix"]
+    assert len(cm) == 4 and all(len(row) == 4 for row in cm)
+    assert set(metrics["per_class"]) == set(SEVERITIES)
+    assert all("precision" in stats and "recall" in stats for stats in metrics["per_class"].values())
