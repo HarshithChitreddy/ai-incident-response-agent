@@ -39,3 +39,24 @@ def test_train_saves_model_and_honest_metrics(trained_dir):
     assert len(cm) == 4 and all(len(row) == 4 for row in cm)
     assert set(metrics["per_class"]) == set(SEVERITIES)
     assert all("precision" in stats and "recall" in stats for stats in metrics["per_class"].values())
+
+
+def test_model_predicts_with_imputation(trained_dir):
+    out, _ = trained_dir
+    model = SeverityModel.load(out / MODEL_FILE)
+
+    result = model.predict(
+        {
+            "alertname": "HighErrorRate",
+            "error_rate_pct": 13.5,
+            "latency_p95_ms": 2300,
+            "deploy_within_hour": True,
+        }
+    )
+    assert result["severity"] in ("high", "critical")  # unambiguous bad day
+    assert abs(sum(result["probabilities"].values()) - 1.0) < 0.01
+    assert "request_rate_rps" in result["imputed_features"]  # missing -> median
+    assert result["method"].startswith("ml/")
+
+    calm = model.predict({"alertname": "HighLatencyP95", "error_rate_pct": 0.2, "latency_p95_ms": 350})
+    assert calm["severity"] in ("low", "medium")
