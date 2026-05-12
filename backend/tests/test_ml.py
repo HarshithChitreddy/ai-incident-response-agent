@@ -60,3 +60,26 @@ def test_model_predicts_with_imputation(trained_dir):
 
     calm = model.predict({"alertname": "HighLatencyP95", "error_rate_pct": 0.2, "latency_p95_ms": 350})
     assert calm["severity"] in ("low", "medium")
+
+
+async def test_tool_prefers_model_and_falls_back(trained_dir, session_factory, monkeypatch):
+    out, _ = trained_dir
+    model = SeverityModel.load(out / MODEL_FILE)
+
+    async with session_factory() as db:
+        ctx = ToolContext(db=db, settings=get_settings())
+
+        monkeypatch.setattr("app.ml.model.get_severity_model", lambda: model)
+        ml_result = await predict_severity(
+            ctx, service="checkout-service", alertname="HighErrorRate", error_rate_pct=12.0
+        )
+        assert ml_result["method"].startswith("ml/")
+        assert "probabilities" in ml_result
+
+        monkeypatch.setattr("app.ml.model.get_severity_model", lambda: None)
+        heuristic_result = await predict_severity(
+            ctx, service="checkout-service", alertname="HighErrorRate", error_rate_pct=12.0,
+            latency_p95_ms=2200, deploy_within_hour=True,
+        )
+        assert heuristic_result["method"].startswith("heuristic")
+        assert heuristic_result["severity"] == "critical"
