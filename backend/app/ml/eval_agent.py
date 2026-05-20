@@ -132,3 +132,90 @@ async def _seed_history(factory, csv_path: Path) -> None:
             ]
         db.add_all(rows)
         await db.commit()
+
+
+async def run_eval(
+    cases_path: Path | str | None = None,
+    limit: int | None = None,
+    llm: LLMClient | None = None,
+) -> dict:
+    settings = get_settings()
+    cases_path = Path(cases_path or settings.data_dir / "eval_incidents.json")
+    spec = json.loads(cases_path.read_text())
+    cases = spec["cases"][:limit] if limit else spec["cases"]
+    benign_pool = spec.get("benign_commit_pool", [])
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    await _seed_history(factory, settings.data_dir / "historical_incidents.csv")
+
+    results: list[dict] = []
+
+    with tempfile.TemporaryDirectory(prefix="agent-eval-") as tmp_str:
+        tmp = Path(tmp_str)
+
+        for case in cases:
+            case_dir = tmp / case["id"]
+            write_case_world(case, benign_pool, case_dir)
+            case_settings = Settings(
+                _env_file=None,
+                data_dir=case_dir,
+                model_dir=settings.model_dir,
+                mock_llm=settings.mock_llm,
+            )
+            expected = case["expected_commit"]
+
+            async with factory() as db:
+                incident = Incident(
+                    fingerprint=case["id"],
+                    alertname=case["alertname"],
+                    service=case["service"],
+                    severity=case["severity"],
+                    status="open",
+                    title=case["title"],
+                    description=case.get("description", ""),
+                    labels={
+                        "alertname": case["alertname"],
+                        "service": case["service"],
+                        "severity": case["severity"],
+                    },
+                    annotations={},
+                    started_at=_parse_ts(case["started_at"]),
+                )
+                db.add(incident)
+                await db.commit()
+                await db.refresh(incident)
+                incident_id = incident.id
+
+                ranked = await rank_likely_commits(
+                    ToolContext(db=db, settings=case_settings),
+                    service=case["service"],
+                    incident_started_at=case["started_at"],
+                )
+
+            ranker_top = ranked[0]["sha"] if ranked else None
+            row = {
+                "case": case["id"],
+                "service": case["service"],
+                "alertname": case["alertname"],
+                "expected": expected,
+                "ranker_top": ranker_top,
+                "ranker_correct": ranker_top == expected,
+            }
+
+            results.append(row)
+
+    await engine.dispose()
+
+    total = len(results)
+    report: dict = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "cases": total,
+        "ranker": _summary(results, "ranker_correct", total),
+        "per_case": results,
+    }
+    return report
