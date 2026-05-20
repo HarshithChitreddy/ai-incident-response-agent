@@ -112,3 +112,23 @@ def write_case_world(case: dict, benign_pool: list[dict], dest: Path) -> None:
             row[anomaly["metric"]] = anomaly["baseline"]
         writer.writerow(row)
     (dest / "sample_metrics.csv").write_text(buf.getvalue())
+
+
+async def _seed_history(factory, csv_path: Path) -> None:
+    if not csv_path.exists():
+        return
+    async with factory() as db:
+        with csv_path.open(newline="") as f:
+            rows = [
+                HistoricalIncident(
+                    service=r["service"], alertname=r["alertname"], severity=r["severity"],
+                    error_rate_pct=float(r["error_rate_pct"]), latency_p95_ms=float(r["latency_p95_ms"]),
+                    request_rate_rps=float(r["request_rate_rps"]), cpu_pct=float(r["cpu_pct"]),
+                    memory_pct=float(r["memory_pct"]), deploy_within_hour=r["deploy_within_hour"] == "1",
+                    root_cause=r["root_cause"], time_to_resolve_min=int(r["time_to_resolve_min"]),
+                    summary=r["summary"],
+                )
+                for r in csv.DictReader(f)
+            ]
+        db.add_all(rows)
+        await db.commit()
