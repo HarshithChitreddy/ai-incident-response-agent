@@ -137,6 +137,7 @@ async def _seed_history(factory, csv_path: Path) -> None:
 async def run_eval(
     cases_path: Path | str | None = None,
     limit: int | None = None,
+    use_agent: bool = True,
     llm: LLMClient | None = None,
 ) -> dict:
     settings = get_settings()
@@ -153,10 +154,18 @@ async def run_eval(
     factory = async_sessionmaker(engine, expire_on_commit=False)
     await _seed_history(factory, settings.data_dir / "historical_incidents.csv")
 
+    llm = llm or get_llm_client()
     results: list[dict] = []
 
     with tempfile.TemporaryDirectory(prefix="agent-eval-") as tmp_str:
         tmp = Path(tmp_str)
+        shared_index = None
+        if use_agent:
+            from app.rag.store import RunbookIndex
+
+            shared_index = RunbookIndex(
+                persist_dir=tmp / "chroma", runbooks_dir=settings.data_dir / "runbooks"
+            )
 
         for case in cases:
             case_dir = tmp / case["id"]
@@ -207,6 +216,32 @@ async def run_eval(
                 "ranker_correct": ranker_top == expected,
             }
 
+            if use_agent:
+                await run_triage_for_incident(
+                    incident_id,
+                    session_factory=factory,
+                    llm=llm,
+                    settings=case_settings,
+                    runbook_index=shared_index,
+                )
+                async with factory() as db:
+                    run = await db.scalar(
+                        select(AgentRun)
+                        .where(AgentRun.incident_id == incident_id, AgentRun.kind == "triage")
+                        .order_by(AgentRun.started_at.desc())
+                        .limit(1)
+                    )
+                analysis = run.result if run is not None and run.status == "completed" else {}
+                candidates = analysis.get("competing_candidates") or []
+                agent_top = str(candidates[0].get("commit", "")) if candidates else ""
+                row |= {
+                    "run_status": run.status if run is not None else "missing",
+                    "agent_top": agent_top,
+                    "agent_correct": expected in agent_top
+                    or expected in str(analysis.get("root_cause", "")),
+                    "agent_recall": expected in json.dumps(analysis),
+                }
+
             results.append(row)
 
     await engine.dispose()
@@ -214,8 +249,14 @@ async def run_eval(
     total = len(results)
     report: dict = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "llm": getattr(llm, "model", "unknown"),
         "cases": total,
         "ranker": _summary(results, "ranker_correct", total),
         "per_case": results,
     }
+    if use_agent:
+        report["agent"] = _summary(results, "agent_correct", total)
+        report["agent"]["candidate_recall"] = round(
+            sum(r.get("agent_recall", False) for r in results) / total, 3
+        )
     return report
