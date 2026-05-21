@@ -260,3 +260,45 @@ async def run_eval(
             sum(r.get("agent_recall", False) for r in results) / total, 3
         )
     return report
+
+
+def _summary(results: list[dict], key: str, total: int) -> dict:
+    correct = sum(r.get(key, False) for r in results)
+    return {"correct": correct, "total": total, "top1_accuracy": round(correct / total, 3)}
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--skip-agent", action="store_true", help="score the ranker only")
+    parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--cases", default=None)
+    args = parser.parse_args()
+
+    report = asyncio.run(
+        run_eval(cases_path=args.cases, limit=args.limit, use_agent=not args.skip_agent)
+    )
+
+    print(f"llm={report['llm']}  cases={report['cases']}")
+    header = f"{'case':<9}{'expected':<15}{'ranker_top':<15}{'r✓':<4}"
+    if "agent" in report:
+        header += f"{'agent_top':<15}{'a✓':<4}"
+    print(header)
+    for row in report["per_case"]:
+        line = f"{row['case']:<9}{row['expected']:<15}{str(row['ranker_top']):<15}{'Y' if row['ranker_correct'] else '.':<4}"
+        if "agent" in report:
+            line += f"{row.get('agent_top', ''):<15}{'Y' if row.get('agent_correct') else '.':<4}"
+        print(line)
+    print(f"\nranker top-1 accuracy: {report['ranker']['top1_accuracy']} ({report['ranker']['correct']}/{report['ranker']['total']})")
+    if "agent" in report:
+        mode = " [MOCK LLM — evidence-pipeline score; run with MOCK_LLM=false for the real number]" if get_settings().mock_llm else ""
+        print(f"agent  top-1 accuracy: {report['agent']['top1_accuracy']} ({report['agent']['correct']}/{report['agent']['total']}){mode}")
+        print(f"agent  candidate recall: {report['agent']['candidate_recall']}")
+
+    out = Path(get_settings().model_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "agent_eval.json").write_text(json.dumps(report, indent=2))
+    print(f"\nreport saved to {out / 'agent_eval.json'}")
+
+
+if __name__ == "__main__":
+    main()
