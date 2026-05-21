@@ -93,3 +93,15 @@ async def test_eval_ranker_hits_planted_culprits():
     # the two designed misses keep the metric honest
     misses = [r["case"] for r in report["per_case"] if not r["ranker_correct"]]
     assert len(misses) <= 3
+
+
+async def test_eval_agent_pipeline_end_to_end():
+    report = await run_eval(limit=2, use_agent=True, llm=MockLLMClient())
+
+    assert report["agent"]["total"] == 2
+    for row in report["per_case"]:
+        assert row["run_status"] == "completed"
+        assert row["agent_top"]  # mock grounds its verdict in the ranker output
+    # on these two clean cases the pipeline should attribute correctly
+    assert report["agent"]["top1_accuracy"] == 1.0
+    assert report["agent"]["candidate_recall"] >= report["agent"]["top1_accuracy"]
