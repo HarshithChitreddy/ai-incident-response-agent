@@ -1,0 +1,440 @@
+{
+  "description": "Agent root-cause eval set: each case is a self-contained evidence world with one known culprit commit, one decoy, and shared benign commits. The harness (app/ml/eval_agent.py) materializes each world into a temp data dir and scores top-1 attribution.",
+  "benign_commit_pool": [
+    {
+      "sha": "b0b0b0000001",
+      "service": "SERVICE",
+      "author": "sam.docs",
+      "message": "Update service README and on-call docs",
+      "files": ["README.md", "docs/oncall.md"],
+      "diff_summary": "Documentation only.",
+      "hours_before": 9
+    },
+    {
+      "sha": "b0b0b0000002",
+      "service": "platform",
+      "author": "ci-bot",
+      "message": "Weekly base image refresh to python:3.12.6-slim",
+      "files": ["docker/base/Dockerfile"],
+      "diff_summary": "Routine patch-level base image bump.",
+      "hours_before": 12
+    },
+    {
+      "sha": "b0b0b0000003",
+      "service": "platform",
+      "author": "ci-bot",
+      "message": "CI: parallelize unit test shards",
+      "files": [".github/workflows/ci.yml"],
+      "diff_summary": "CI pipeline change only.",
+      "hours_before": 16
+    },
+    {
+      "sha": "b0b0b0000004",
+      "service": "SERVICE",
+      "author": "dan.velasquez",
+      "message": "Fix flaky pagination unit test",
+      "files": ["tests/unit/test_pagination.py"],
+      "diff_summary": "Test-only change; replaced sleep with polling assertion.",
+      "hours_before": 7
+    }
+  ],
+  "cases": [
+    {
+      "id": "eval-01",
+      "service": "checkout-service",
+      "alertname": "HighErrorRate",
+      "severity": "critical",
+      "started_at": "2026-06-24T14:00:00Z",
+      "title": "checkout-service 5xx error rate at 11.8%",
+      "description": "Payment authorization timeouts on POST /api/checkout/confirm.",
+      "expected_commit": "c0ffee000001",
+      "case_commits": [
+        {
+          "sha": "c0ffee000001",
+          "author": "maya.okafor",
+          "message": "Tighten payment gateway deadline 5s->2s and add retry wrapper",
+          "files": ["checkout/clients/payment_gateway.py"],
+          "diff_summary": "Reduced timeout below upstream p50 and wrapped authorize() in 3 retries without backoff.",
+          "hours_before": 1.2
+        },
+        {
+          "sha": "dec0de000001",
+          "author": "dan.velasquez",
+          "message": "Add structured logging to confirmation flow",
+          "files": ["checkout/api/confirm.py"],
+          "diff_summary": "Log fields only, no behavioral change.",
+          "hours_before": 0.8
+        }
+      ],
+      "logs": [
+        {"level": "ERROR", "message": "PaymentGatewayTimeout: authorize() exceeded 2000ms deadline (attempt 3/3), giving up"},
+        {"level": "ERROR", "message": "POST /api/checkout/confirm -> 502 payment authorization failed after retries"},
+        {"level": "WARNING", "message": "payment-gateway request volume up 2.8x in 20m; retry storm suspected"}
+      ],
+      "anomaly": {"metric": "error_rate_pct", "baseline": 0.5, "peak": 11.8}
+    },
+    {
+      "id": "eval-02",
+      "service": "orders-service",
+      "alertname": "DBConnectionPoolExhausted",
+      "severity": "critical",
+      "started_at": "2026-06-25T09:30:00Z",
+      "title": "orders-service DB pool exhausted (0 idle of 5)",
+      "description": "Requests queueing waiting for a database connection.",
+      "expected_commit": "c0ffee000002",
+      "case_commits": [
+        {
+          "sha": "c0ffee000002",
+          "author": "priya.raman",
+          "message": "Shrink DB pool size 20->5 and disable overflow connections",
+          "files": ["orders/db/pool.py", "orders/config/database.yaml"],
+          "diff_summary": "Cost cleanup: pool_size 5, max_overflow 0.",
+          "hours_before": 1.8
+        },
+        {
+          "sha": "dec0de000002",
+          "author": "leo.martins",
+          "message": "Increase statement timeout config for reporting queries",
+          "files": ["orders/config/database.yaml"],
+          "diff_summary": "Raised statement_timeout from 30s to 60s.",
+          "hours_before": 30
+        }
+      ],
+      "logs": [
+        {"level": "ERROR", "message": "TimeoutError: could not acquire connection from pool within 10s (size=5, overflow=0)"},
+        {"level": "WARNING", "message": "Connection pool saturated: 5/5 in use, 7 waiters queued"}
+      ],
+      "anomaly": {"metric": "latency_p95_ms", "baseline": 180, "peak": 9500}
+    },
+    {
+      "id": "eval-03",
+      "service": "search-service",
+      "alertname": "HighLatencyP95",
+      "severity": "warning",
+      "started_at": "2026-06-26T16:45:00Z",
+      "title": "search-service p95 latency at 2300ms",
+      "description": "Slow Elasticsearch queries; error rate still low.",
+      "expected_commit": "c0ffee000003",
+      "case_commits": [
+        {
+          "sha": "c0ffee000003",
+          "author": "leo.martins",
+          "message": "Remove per-query synonym expansion limit in parser config",
+          "files": ["search/query/parser.py", "search/config/expansion.yaml"],
+          "diff_summary": "Expansion now unbounded; clause count per query no longer capped.",
+          "hours_before": 1.5
+        },
+        {
+          "sha": "dec0de000003",
+          "author": "sam.docs",
+          "message": "Update search API documentation",
+          "files": ["docs/search-api.md"],
+          "diff_summary": "Documentation only.",
+          "hours_before": 0.9
+        }
+      ],
+      "logs": [
+        {"level": "WARNING", "message": "Synonym expansion produced 52 terms for query 'running shoes'; ES query time 2100ms"},
+        {"level": "WARNING", "message": "Elasticsearch bool query clause count 55 exceeds recommended 24"}
+      ],
+      "anomaly": {"metric": "latency_p95_ms", "baseline": 480, "peak": 2300}
+    },
+    {
+      "id": "eval-04",
+      "service": "recommendation-service",
+      "alertname": "HighMemoryUsage",
+      "severity": "warning",
+      "started_at": "2026-06-27T11:15:00Z",
+      "title": "recommendation-service memory at 92% and climbing",
+      "description": "Steady heap growth over 6 hours with flat traffic.",
+      "expected_commit": "c0ffee000004",
+      "case_commits": [
+        {
+          "sha": "c0ffee000004",
+          "author": "sofia.nguyen",
+          "message": "Cache user embeddings in-process without eviction",
+          "files": ["reco/serving/embedding_cache.py"],
+          "diff_summary": "Module-level dict keyed by user_id; TODO: add LRU eviction.",
+          "hours_before": 1.9
+        },
+        {
+          "sha": "dec0de000004",
+          "author": "sofia.nguyen",
+          "message": "Raise inference batch size 32->64",
+          "files": ["reco/serving/batcher.py"],
+          "diff_summary": "Validated in staging; memory profile flat.",
+          "hours_before": 26
+        }
+      ],
+      "logs": [
+        {"level": "WARNING", "message": "Heap usage 92% (3.7GiB/4.0GiB); embedding_cache entries=911204 and growing"},
+        {"level": "WARNING", "message": "GC pause p99 360ms, up from 40ms baseline"}
+      ],
+      "anomaly": {"metric": "memory_pct", "baseline": 62, "peak": 92}
+    },
+    {
+      "id": "eval-05",
+      "service": "orders-service",
+      "alertname": "HighErrorRate",
+      "severity": "critical",
+      "started_at": "2026-06-28T13:20:00Z",
+      "title": "orders-service write errors at 7.4%",
+      "description": "Order writes timing out during peak traffic.",
+      "expected_commit": "c0ffee000005",
+      "case_commits": [
+        {
+          "sha": "c0ffee000005",
+          "author": "priya.raman",
+          "message": "Run online migration adding composite index to orders table",
+          "files": ["orders/migrations/0042_orders_idx.py"],
+          "diff_summary": "CREATE INDEX without CONCURRENTLY; takes ACCESS EXCLUSIVE lock.",
+          "hours_before": 0.5
+        },
+        {
+          "sha": "dec0de000005",
+          "author": "dan.velasquez",
+          "message": "Bump httpx from 0.27.0 to 0.27.2",
+          "files": ["orders/requirements.txt"],
+          "diff_summary": "Routine dependency patch bump.",
+          "hours_before": 1.0
+        }
+      ],
+      "logs": [
+        {"level": "ERROR", "message": "LockNotAvailable: canceling statement due to lock timeout on relation orders"},
+        {"level": "ERROR", "message": "POST /api/orders -> 503 write timed out after 5000ms"}
+      ],
+      "anomaly": {"metric": "error_rate_pct", "baseline": 0.4, "peak": 7.4}
+    },
+    {
+      "id": "eval-06",
+      "service": "payments-service",
+      "alertname": "HighErrorRate",
+      "severity": "critical",
+      "started_at": "2026-06-29T08:05:00Z",
+      "title": "payments-service auth failures at 10.5%",
+      "description": "Provider API rejecting requests from half the fleet.",
+      "expected_commit": "c0ffee000006",
+      "case_commits": [
+        {
+          "sha": "c0ffee000006",
+          "author": "maya.okafor",
+          "message": "Rotate provider API keys via new secrets config loader",
+          "files": ["payments/config/secrets.py"],
+          "diff_summary": "Loader reads rotated key set; pods must restart to pick up.",
+          "hours_before": 1.6
+        },
+        {
+          "sha": "dec0de000006",
+          "author": "dan.velasquez",
+          "message": "Fix flaky reconciliation integration test",
+          "files": ["tests/integration/test_reconciliation.py"],
+          "diff_summary": "Test-only change.",
+          "hours_before": 0.9
+        }
+      ],
+      "logs": [
+        {"level": "ERROR", "message": "ProviderAuthError: 401 invalid api key (key id pk_live_7f3)"},
+        {"level": "WARNING", "message": "Auth failure rate differs by pod generation: old pods 21%, new pods 0%"}
+      ],
+      "anomaly": {"metric": "error_rate_pct", "baseline": 0.6, "peak": 10.5}
+    },
+    {
+      "id": "eval-07",
+      "service": "checkout-service",
+      "alertname": "HighLatencyP95",
+      "severity": "warning",
+      "started_at": "2026-06-30T17:40:00Z",
+      "title": "checkout-service p95 latency at 1900ms",
+      "description": "Checkout confirmation slowed; error rate normal.",
+      "expected_commit": "c0ffee000007",
+      "case_commits": [
+        {
+          "sha": "c0ffee000007",
+          "author": "maya.okafor",
+          "message": "Add synchronous fraud-check call with 3s timeout to checkout hot path",
+          "files": ["checkout/api/confirm.py", "checkout/clients/fraud.py"],
+          "diff_summary": "Blocking call to fraud-service before authorization.",
+          "hours_before": 1.4
+        },
+        {
+          "sha": "dec0de000007",
+          "author": "ci-bot",
+          "message": "Rebuild on refreshed base image",
+          "files": ["docker/base/Dockerfile"],
+          "diff_summary": "No application change.",
+          "hours_before": 2.0
+        }
+      ],
+      "logs": [
+        {"level": "WARNING", "message": "fraud-service p50 820ms now dominates confirm handler latency"},
+        {"level": "WARNING", "message": "POST /api/checkout/confirm p95 1900ms, budget 800ms"}
+      ],
+      "anomaly": {"metric": "latency_p95_ms", "baseline": 410, "peak": 1900}
+    },
+    {
+      "id": "eval-08",
+      "service": "search-service",
+      "alertname": "HighErrorRate",
+      "severity": "critical",
+      "started_at": "2026-07-01T10:10:00Z",
+      "title": "search-service indexing errors at 4.9%",
+      "description": "Writes to the daily index failing since morning rollout.",
+      "expected_commit": "c0ffee000008",
+      "case_commits": [
+        {
+          "sha": "c0ffee000008",
+          "author": "leo.martins",
+          "message": "Apply new index template with strict mapping config",
+          "files": ["search/es/templates/daily.json"],
+          "diff_summary": "strict dynamic mapping rejects docs with unexpected fields.",
+          "hours_before": 1.1
+        },
+        {
+          "sha": "dec0de000008",
+          "author": "leo.martins",
+          "message": "Tune ES client connection pool sizes",
+          "files": ["search/es/client.py"],
+          "diff_summary": "Raised pool from 10 to 20 connections.",
+          "hours_before": 28
+        }
+      ],
+      "logs": [
+        {"level": "ERROR", "message": "strict_dynamic_mapping_exception: mapping set to strict, dynamic introduction of [promo_tags] not allowed"},
+        {"level": "ERROR", "message": "bulk index request failed: 212 of 500 docs rejected"}
+      ],
+      "anomaly": {"metric": "error_rate_pct", "baseline": 0.3, "peak": 4.9}
+    },
+    {
+      "id": "eval-09",
+      "service": "payments-service",
+      "alertname": "DBConnectionPoolExhausted",
+      "severity": "critical",
+      "started_at": "2026-07-02T15:55:00Z",
+      "title": "payments-service DB pool exhausted during reconciliation",
+      "description": "Ledger queries queueing; reconciliation job running.",
+      "expected_commit": "c0ffee000009",
+      "case_commits": [
+        {
+          "sha": "c0ffee000009",
+          "author": "priya.raman",
+          "message": "Batch reconciliation now holds DB connections across pages",
+          "files": ["payments/jobs/reconcile.py"],
+          "diff_summary": "Connection acquired once per batch run instead of per page; long transactions.",
+          "hours_before": 1.7
+        },
+        {
+          "sha": "dec0de000009",
+          "author": "dan.velasquez",
+          "message": "Improve reconciliation job logging",
+          "files": ["payments/jobs/logging.py"],
+          "diff_summary": "Log fields only.",
+          "hours_before": 1.0
+        }
+      ],
+      "logs": [
+        {"level": "ERROR", "message": "could not acquire connection from pool within 10s (in use: 8/8)"},
+        {"level": "WARNING", "message": "pg_stat_activity: 6 sessions idle in transaction > 240s, all from reconcile worker"}
+      ],
+      "anomaly": {"metric": "latency_p95_ms", "baseline": 220, "peak": 8600}
+    },
+    {
+      "id": "eval-10",
+      "service": "recommendation-service",
+      "alertname": "HighErrorRate",
+      "severity": "critical",
+      "started_at": "2026-07-03T12:25:00Z",
+      "title": "recommendation-service 5xx at 5.6% after model rollout",
+      "description": "Feature vector shape mismatch since midday deploy.",
+      "expected_commit": "c0ffee000010",
+      "case_commits": [
+        {
+          "sha": "c0ffee000010",
+          "author": "sofia.nguyen",
+          "message": "Deploy feature pipeline v2 with new embedding config",
+          "files": ["reco/features/pipeline.py", "reco/config/embeddings.yaml"],
+          "diff_summary": "Embedding dim 256->384; serving model expects 256.",
+          "hours_before": 0.7
+        },
+        {
+          "sha": "dec0de000010",
+          "author": "sofia.nguyen",
+          "message": "Add retry to feature-store client",
+          "files": ["reco/clients/feature_store.py"],
+          "diff_summary": "3 retries with exponential backoff on read timeouts.",
+          "hours_before": 23
+        }
+      ],
+      "logs": [
+        {"level": "ERROR", "message": "ValueError: shapes (1,384) and (256,64) not aligned in scoring layer"},
+        {"level": "ERROR", "message": "GET /api/recommendations -> 500 model scoring failed"}
+      ],
+      "anomaly": {"metric": "error_rate_pct", "baseline": 0.2, "peak": 5.6}
+    },
+    {
+      "id": "eval-11",
+      "service": "checkout-service",
+      "alertname": "HighErrorRate",
+      "severity": "critical",
+      "started_at": "2026-07-04T09:50:00Z",
+      "title": "checkout-service order total errors at 6.2%",
+      "description": "Totals validation rejecting orders since morning. Designed heuristic miss: the culprit message carries no risky keywords while the decoy does.",
+      "expected_commit": "c0ffee000011",
+      "case_commits": [
+        {
+          "sha": "c0ffee000011",
+          "author": "dan.velasquez",
+          "message": "Refactor price rounding in totals calculation",
+          "files": ["checkout/domain/totals.py"],
+          "diff_summary": "Switched bankers rounding to floor; off-by-a-cent on some carts.",
+          "hours_before": 1.5
+        },
+        {
+          "sha": "dec0de000011",
+          "author": "maya.okafor",
+          "message": "Tune Redis session cache TTL config",
+          "files": ["checkout/config/cache.yaml"],
+          "diff_summary": "TTL 30m -> 45m; read path unchanged.",
+          "hours_before": 1.0
+        }
+      ],
+      "logs": [
+        {"level": "ERROR", "message": "TotalsMismatchError: line items sum 4899 != order total 4900 (cents), order rejected"},
+        {"level": "ERROR", "message": "POST /api/checkout/confirm -> 422 totals validation failed"}
+      ],
+      "anomaly": {"metric": "error_rate_pct", "baseline": 0.5, "peak": 6.2}
+    },
+    {
+      "id": "eval-12",
+      "service": "orders-service",
+      "alertname": "HighLatencyP95",
+      "severity": "warning",
+      "started_at": "2026-07-05T18:30:00Z",
+      "title": "orders-service p95 latency creeping to 2600ms",
+      "description": "Gradual slowdown over the day; no deploy in the last 12 hours. Designed heuristic miss: the culprit is a 30-hour-old slow-burn change; the decoy is recent and keyword-heavy.",
+      "expected_commit": "c0ffee000012",
+      "case_commits": [
+        {
+          "sha": "c0ffee000012",
+          "author": "priya.raman",
+          "message": "Change ORM lazy loading to eager for order items",
+          "files": ["orders/models/order.py"],
+          "diff_summary": "joinedload on 3 collections; row explosion grows with catalog size.",
+          "hours_before": 30
+        },
+        {
+          "sha": "dec0de000012",
+          "author": "dan.velasquez",
+          "message": "Add DB connection pool metrics exporter",
+          "files": ["orders/telemetry/pool_metrics.py"],
+          "diff_summary": "Read-only gauge export; no query path change.",
+          "hours_before": 1.2
+        }
+      ],
+      "logs": [
+        {"level": "WARNING", "message": "GET /api/orders/{id} generated 1 query returning 8400 joined rows"},
+        {"level": "WARNING", "message": "p95 latency 2600ms; slowest spans dominated by ORM row hydration"}
+      ],
+      "anomaly": {"metric": "latency_p95_ms", "baseline": 240, "peak": 2600}
+    }
+  ]
+}
