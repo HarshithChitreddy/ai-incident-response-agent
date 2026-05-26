@@ -73,6 +73,7 @@ class LLMClient(Protocol):
 # Mock implementation
 # --------------------------------------------------------------------------- #
 
+_SERVICE_RE = re.compile(r"\b[a-z][a-z0-9]*(?:-[a-z0-9]+)*-service\b")
 _ALERTNAME_RE = re.compile(r"alertname[\"':\s]+([A-Za-z][A-Za-z0-9_]+)")
 
 
@@ -142,6 +143,13 @@ class MockLLMClient:
             case "string":
                 if "alertname" in name or "alert_name" in name:
                     return self._detect_alertname(messages) or "HighErrorRate"
+                if "service" in name:
+                    return self._detect_service(messages)
+                if any(k in name for k in ("query", "pattern", "keyword")):
+                    # compose a realistic search query from the incident context
+                    alertname = self._detect_alertname(messages)
+                    service = self._detect_service(messages)
+                    return f"{alertname} {service} error".strip()
                 return f"mock-{name}"
             case "integer":
                 return 5
@@ -168,12 +176,17 @@ class MockLLMClient:
         return " ".join(chunks)
 
     @classmethod
+    def _detect_service(cls, messages: list[Message]) -> str:
+        match = _SERVICE_RE.search(cls._all_text(messages))
+        return match.group(0) if match else "checkout-service"
+
+    @classmethod
     def _detect_alertname(cls, messages: list[Message]) -> str:
         match = _ALERTNAME_RE.search(cls._all_text(messages))
         return match.group(1) if match else ""
 
     def _final_text(self, system: str, messages: list[Message]) -> str:
-        service = "checkout-service"
+        service = self._detect_service(messages)
         blob = (system + " " + json.dumps(messages, default=str)).lower()
 
         if "postmortem" in blob:
