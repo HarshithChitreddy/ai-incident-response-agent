@@ -130,11 +130,39 @@ class MockLLMClient:
     def _fake_input(self, schema: dict[str, Any], messages: list[Message]) -> dict[str, Any]:
         props: dict[str, Any] = schema.get("properties", {})
         required = set(schema.get("required", list(props)))
+        observed = self._observed_metrics(messages)
         out: dict[str, Any] = {}
         for name, spec in props.items():
             if name in required:
                 out[name] = self._fake_value(name, spec, messages)
+            elif spec.get("type") == "number" and name in observed:
+                # optional numerics get the values actually observed earlier in
+                # the loop (query_metrics result) — like a real model would pass
+                out[name] = observed[name]
         return out
+
+    @staticmethod
+    def _observed_metrics(messages: list[Message]) -> dict[str, float]:
+        """Current metric values from a query_metrics tool result, if any."""
+        for msg in reversed(messages):
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not (isinstance(block, dict) and block.get("type") == "tool_result"):
+                    continue
+                try:
+                    parsed = json.loads(block.get("content", ""))
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    continue
+                summary = parsed.get("summary") if isinstance(parsed, dict) else None
+                if isinstance(summary, dict) and summary:
+                    return {
+                        key: stats["current"]
+                        for key, stats in summary.items()
+                        if isinstance(stats, dict) and isinstance(stats.get("current"), (int, float))
+                    }
+        return {}
 
     def _fake_value(self, name: str, spec: dict[str, Any], messages: list[Message]) -> Any:
         if "enum" in spec:
