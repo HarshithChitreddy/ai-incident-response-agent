@@ -73,6 +73,8 @@ class LLMClient(Protocol):
 # Mock implementation
 # --------------------------------------------------------------------------- #
 
+_ALERTNAME_RE = re.compile(r"alertname[\"':\s]+([A-Za-z][A-Za-z0-9_]+)")
+
 
 class MockLLMClient:
     def __init__(self, model: str = "mock-claude") -> None:
@@ -138,6 +140,8 @@ class MockLLMClient:
             return spec["enum"][0]
         match spec.get("type"):
             case "string":
+                if "alertname" in name or "alert_name" in name:
+                    return self._detect_alertname(messages) or "HighErrorRate"
                 return f"mock-{name}"
             case "integer":
                 return 5
@@ -149,6 +153,24 @@ class MockLLMClient:
                 return []
             case _:
                 return {}
+
+    @staticmethod
+    def _all_text(messages: list[Message]) -> str:
+        chunks: list[str] = []
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, str):
+                chunks.append(content)
+            elif isinstance(content, list):
+                for b in content:
+                    if isinstance(b, dict):
+                        chunks.append(str(b.get("text", "")) + str(b.get("content", "")))
+        return " ".join(chunks)
+
+    @classmethod
+    def _detect_alertname(cls, messages: list[Message]) -> str:
+        match = _ALERTNAME_RE.search(cls._all_text(messages))
+        return match.group(1) if match else ""
 
     def _final_text(self, system: str, messages: list[Message]) -> str:
         service = "checkout-service"
