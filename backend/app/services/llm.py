@@ -213,6 +213,39 @@ class MockLLMClient:
         match = _ALERTNAME_RE.search(cls._all_text(messages))
         return match.group(1) if match else ""
 
+    @staticmethod
+    def _ranked_shas_from_tools(messages: list[Message]) -> list[str]:
+        """Pull the rank_likely_commits tool result out of the conversation so
+        the mock's verdict is grounded in the actual evidence pipeline — this
+        is what makes mock-mode agent evals measure ranking quality, not
+        canned text."""
+        id_to_name: dict[str, str] = {}
+        results: dict[str, str] = {}
+        for msg in messages:
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "tool_use":
+                    id_to_name[block.get("id", "")] = block.get("name", "")
+                elif block.get("type") == "tool_result":
+                    results[block.get("tool_use_id", "")] = block.get("content", "")
+
+        for tool_id, name in id_to_name.items():
+            if name != "rank_likely_commits" or tool_id not in results:
+                continue
+            try:
+                ranked = json.loads(results[tool_id])
+            except (json.JSONDecodeError, TypeError, ValueError):
+                continue
+            if isinstance(ranked, list):
+                shas = [c.get("sha") for c in ranked if isinstance(c, dict) and c.get("sha")]
+                if shas:
+                    return shas
+        return []
+
     def _final_text(self, system: str, messages: list[Message]) -> str:
         service = self._detect_service(messages)
         blob = (system + " " + json.dumps(messages, default=str)).lower()
@@ -222,8 +255,9 @@ class MockLLMClient:
         if "slack" in blob:
             return _SLACK_BRIEF_TEMPLATE.format(service=service)
 
-        top_sha = "9f2c41ab7e03"
-        runner_up = "4b8e19d3c5f7"
+        shas = self._ranked_shas_from_tools(messages)
+        top_sha = shas[0] if shas else "9f2c41ab7e03"
+        runner_up = shas[1] if len(shas) > 1 else "4b8e19d3c5f7"
 
         analysis = {
             "root_cause": (
