@@ -143,6 +143,87 @@ async def test_mock_tool_inputs_satisfy_the_schema():
     assert set(call2.input) >= {"service", "query", "level"}
 
 
+async def test_mock_fills_alertname_and_service_from_context():
+    tools = [
+        {
+            "name": "predict_severity",
+            "description": "Predict severity.",
+            "input_schema": {
+                "type": "object",
+                "properties": {"service": {"type": "string"}, "alertname": {"type": "string"}},
+                "required": ["service", "alertname"],
+            },
+        }
+    ]
+    client = MockLLMClient()
+    resp = await client.create_message(
+        system="triage",
+        messages=[
+            {
+                "role": "user",
+                "content": "alertname: HighMemoryUsage\nservice: recommendation-service\nstarted_at: ...",
+            }
+        ],
+        tools=tools,
+    )
+
+    [call] = resp.tool_calls
+    assert call.input["alertname"] == "HighMemoryUsage"  # not "mock-alertname"
+    assert call.input["service"] == "recommendation-service"
+
+
+async def test_mock_passes_observed_metrics_to_optional_fields():
+    tools = [
+        {
+            "name": "predict_severity",
+            "description": "Predict severity.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "service": {"type": "string"},
+                    "alertname": {"type": "string"},
+                    "error_rate_pct": {"type": "number"},
+                    "latency_p95_ms": {"type": "number"},
+                },
+                "required": ["service", "alertname"],
+            },
+        }
+    ]
+    metrics_result = json.dumps(
+        {
+            "service": "checkout-service",
+            "summary": {
+                "error_rate_pct": {"baseline": 0.5, "current": 12.2, "delta_pct": 2340.0},
+                "latency_p95_ms": {"baseline": 395.0, "current": 2183.3, "delta_pct": 452.7},
+            },
+        }
+    )
+    client = MockLLMClient()
+    resp = await client.create_message(
+        system="triage",
+        messages=[
+            {"role": "user", "content": "alertname: HighErrorRate on checkout-service"},
+            {
+                "role": "assistant",
+                "content": [
+                    {"type": "tool_use", "id": "t1", "name": "query_metrics", "input": {}}
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "tool_result", "tool_use_id": "t1", "content": metrics_result}
+                ],
+            },
+        ],
+        tools=tools,
+    )
+
+    [call] = resp.tool_calls
+    assert call.input["error_rate_pct"] == 12.2  # observed, not imputed
+    assert call.input["latency_p95_ms"] == 2183.3
+
+
 async def test_mock_without_tools_returns_final_text():
     client = MockLLMClient()
     resp = await client.create_message(
