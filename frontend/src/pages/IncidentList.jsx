@@ -1,5 +1,8 @@
+import { Link } from "react-router-dom";
 import { api } from "../services/api";
 import usePolling from "../services/usePolling";
+import { fmtTs, timeAgo } from "../services/format";
+import { SeverityBadge, StatusBadge } from "../components/Badges";
 import { Empty } from "../components/Panel";
 
 export default function IncidentList() {
@@ -27,6 +30,42 @@ export default function IncidentList() {
           <span className="stat-label">total tracked</span>
         </div>
       </div>
+
+      {incidents.length === 0 ? (
+        <Empty>
+          No incidents yet. Fire one with{" "}
+          <code>python scripts/send_alert.py high_error_rate</code>
+        </Empty>
+      ) : (
+        <table className="incident-table">
+          <thead>
+            <tr>
+              <th>severity</th>
+              <th>status</th>
+              <th>service</th>
+              <th>alert</th>
+              <th>title</th>
+              <th>started</th>
+            </tr>
+          </thead>
+          <tbody>
+            {incidents.map((incident) => (
+              <tr key={incident.id}>
+                <td><SeverityBadge severity={incident.severity} /></td>
+                <td><StatusBadge status={incident.status} /></td>
+                <td>{incident.service}</td>
+                <td>{incident.alertname}</td>
+                <td>
+                  <Link to={`/incidents/${incident.id}`} className="incident-link">
+                    {incident.title}
+                  </Link>
+                </td>
+                <td title={fmtTs(incident.started_at)}>{timeAgo(incident.started_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
