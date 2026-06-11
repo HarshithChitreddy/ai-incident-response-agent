@@ -91,6 +91,26 @@ export default function IncidentDetail() {
                     </ol>
                   </>
                 )}
+                {(analysis.competing_candidates || []).length > 0 && (
+                  <>
+                    <h4>Candidate commits</h4>
+                    <table className="candidates">
+                      <tbody>
+                        {analysis.competing_candidates.map((candidate, i) => (
+                          <tr key={i}>
+                            <td className="mono">{candidate.commit}</td>
+                            <td>
+                              <span className={`badge likelihood-${candidate.likelihood}`}>
+                                {candidate.likelihood}
+                              </span>
+                            </td>
+                            <td className="muted">{candidate.reason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )}
               </>
             )}
           </Panel>
