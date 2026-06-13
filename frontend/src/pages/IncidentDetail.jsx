@@ -15,6 +15,8 @@ export default function IncidentDetail() {
   const { data: incident } = usePolling(() => api.incident(id), [id], 3000);
   const { data: analysisEnvelope } = usePolling(() => api.analysis(id), [id], 4000);
   const { data: trace } = usePolling(() => api.trace(id), [id], 4000);
+  const { data: slack } = usePolling(() => api.slack(id), [id], 5000);
+  const { data: postmortem } = usePolling(() => api.postmortem(id), [id], 5000);
 
   if (incident === undefined) return <Empty>loading…</Empty>;
   if (incident === null) return <Empty>Incident not found. <Link to="/">Back to list</Link></Empty>;
@@ -147,6 +149,18 @@ export default function IncidentDetail() {
                   <Markdown text={runbook.content} />
                 </details>
               </>
+            )}
+          </Panel>
+
+          <Panel title="Postmortem">
+            {postmortem === null || postmortem === undefined ? (
+              <Empty>
+                {incident.status === "resolved"
+                  ? "generating postmortem…"
+                  : "available after the incident is resolved"}
+              </Empty>
+            ) : (
+              <Markdown text={postmortem.markdown} />
             )}
           </Panel>
         </div>
