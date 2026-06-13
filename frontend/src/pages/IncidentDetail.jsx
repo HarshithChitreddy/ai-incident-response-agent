@@ -6,6 +6,7 @@ import { duration, fmtTs, pct } from "../services/format";
 import { SeverityBadge, StatusBadge } from "../components/Badges";
 import Panel, { Empty } from "../components/Panel";
 import ConfidenceBar from "../components/ConfidenceBar";
+import Markdown from "../components/Markdown";
 
 export default function IncidentDetail() {
   const { id } = useParams();
@@ -13,11 +14,14 @@ export default function IncidentDetail() {
 
   const { data: incident } = usePolling(() => api.incident(id), [id], 3000);
   const { data: analysisEnvelope } = usePolling(() => api.analysis(id), [id], 4000);
+  const { data: trace } = usePolling(() => api.trace(id), [id], 4000);
 
   if (incident === undefined) return <Empty>loading…</Empty>;
   if (incident === null) return <Empty>Incident not found. <Link to="/">Back to list</Link></Empty>;
 
   const analysis = analysisEnvelope?.analysis;
+  const runbookStep = (trace || []).find((s) => s.name === "retrieve_runbook");
+  const runbook = runbookStep?.output;
 
   const onResolve = async () => {
     setResolving(true);
@@ -111,6 +115,37 @@ export default function IncidentDetail() {
                     </table>
                   </>
                 )}
+              </>
+            )}
+          </Panel>
+
+          <Panel
+            title="Matched runbook"
+            right={runbook && <span className="muted mono">{runbook.retriever}</span>}
+          >
+            {!runbook ? (
+              <Empty>no runbook retrieved yet</Empty>
+            ) : (
+              <>
+                <div className="runbook-head">
+                  <span className="mono">{runbook.runbook}</span>
+                  {typeof runbook.match_score === "number" && (
+                    <span className="muted">score {runbook.match_score}</span>
+                  )}
+                </div>
+                {(runbook.matched_sections || []).length > 0 && (
+                  <div className="runbook-sections">
+                    {runbook.matched_sections.map((section, i) => (
+                      <span key={i} className="section-chip">
+                        {section.section || "intro"} · {section.score}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <details>
+                  <summary>full runbook</summary>
+                  <Markdown text={runbook.content} />
+                </details>
               </>
             )}
           </Panel>
