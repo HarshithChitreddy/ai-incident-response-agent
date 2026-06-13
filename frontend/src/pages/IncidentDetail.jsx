@@ -7,6 +7,7 @@ import { SeverityBadge, StatusBadge } from "../components/Badges";
 import Panel, { Empty } from "../components/Panel";
 import ConfidenceBar from "../components/ConfidenceBar";
 import Markdown from "../components/Markdown";
+import TraceTimeline from "../components/TraceTimeline";
 
 export default function IncidentDetail() {
   const { id } = useParams();
@@ -165,7 +166,19 @@ export default function IncidentDetail() {
           </Panel>
         </div>
 
-        <div className="detail-col" />
+        <div className="detail-col">
+          <Panel
+            title="Agent reasoning trace"
+            right={trace && <span className="muted">{trace.length} steps</span>}
+            className="panel-trace"
+          >
+            {!trace || trace.length === 0 ? (
+              <Empty>no trace yet</Empty>
+            ) : (
+              <TraceTimeline steps={trace} />
+            )}
+          </Panel>
+        </div>
       </div>
     </div>
   );
