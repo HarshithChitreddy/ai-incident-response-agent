@@ -7,6 +7,7 @@ import { SeverityBadge, StatusBadge } from "../components/Badges";
 import Panel, { Empty } from "../components/Panel";
 import ConfidenceBar from "../components/ConfidenceBar";
 import Markdown from "../components/Markdown";
+import SlackPreview from "../components/SlackPreview";
 import TraceTimeline from "../components/TraceTimeline";
 
 export default function IncidentDetail() {
@@ -176,6 +177,20 @@ export default function IncidentDetail() {
               <Empty>no trace yet</Empty>
             ) : (
               <TraceTimeline steps={trace} />
+            )}
+          </Panel>
+
+          <Panel title="Slack feed">
+            {!slack || slack.length === 0 ? (
+              <Empty>no messages yet</Empty>
+            ) : (
+              slack.map((message) => <SlackPreview key={message.id} message={message} />)
+            )}
+            {analysis?.slack_brief && (
+              <details className="brief-raw">
+                <summary>LLM-drafted brief (raw text)</summary>
+                <pre>{analysis.slack_brief}</pre>
+              </details>
             )}
           </Panel>
         </div>
