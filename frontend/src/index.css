@@ -40,3 +40,31 @@ h1 { font-size: 18px; font-weight: 600; color: var(--text-strong); margin: 4px 0
 .topbar-note { color: var(--faint); font-size: 11px; margin-left: auto; }
 
 .page { padding: 18px; max-width: 1400px; margin: 0 auto; }
+
+.stats-row { display: flex; gap: 12px; margin-bottom: 16px; }
+.stat {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px 16px; display: flex; align-items: baseline; gap: 8px; min-width: 120px;
+}
+.stat-value { font-size: 20px; font-weight: 600; color: var(--text-strong); }
+.stat-label { color: var(--muted); font-size: 12px; }
+.stat-critical .stat-value { color: #d92d20; }
+
+.incident-table {
+  width: 100%; border-collapse: collapse;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+}
+.incident-table th {
+  text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border);
+}
+.incident-table td { padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); font-size: 13px; }
+.incident-table tr:last-child td { border-bottom: none; }
+.incident-link { color: var(--link); font-weight: 500; }
+
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  background: var(--panel-2); color: var(--text);
+}
+.empty { color: var(--faint); padding: 12px; font-size: 13px; }
