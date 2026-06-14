@@ -193,6 +193,28 @@ export default function IncidentDetail() {
               </details>
             )}
           </Panel>
+
+          <Panel title="Alert details">
+            <div className="chips">
+              {Object.entries(incident.labels || {}).map(([key, value]) => (
+                <span key={key} className="chip">
+                  <span className="chip-key">{key}</span>={value}
+                </span>
+              ))}
+            </div>
+            {incident.description && <p className="muted">{incident.description}</p>}
+            <h4>Alert events</h4>
+            <ul className="events">
+              {(incident.events || []).map((event) => (
+                <li key={event.id}>
+                  <span className={`event-dot event-${event.status}`} />
+                  <span className="mono">{event.status}</span>
+                  <span className="muted">{fmtTs(event.received_at)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="muted mono small">fingerprint {incident.fingerprint}</div>
+          </Panel>
         </div>
       </div>
     </div>
