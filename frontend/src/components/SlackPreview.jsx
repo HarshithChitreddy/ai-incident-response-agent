@@ -62,15 +62,24 @@ function Block({ block, idx }) {
 }
 
 export default function SlackPreview({ message }) {
+  const delivery =
+    message.transport === "mock" ? "mock" : message.delivered ? "delivered" : "failed";
   return (
     <div className="slack-message">
-      <div className="slack-meta">
-        <span className="slack-channel">{message.channel}</span>
-        <span className="slack-ts">{fmtTs(message.created_at)}</span>
+      <div className="slack-avatar">IR</div>
+      <div className="slack-body">
+        <div className="slack-meta">
+          <span className="slack-bot">incident-agent</span>
+          <span className="slack-app-tag">APP</span>
+          <span className="slack-ts">{fmtTs(message.created_at)}</span>
+          <span className={`slack-delivery ${message.delivered ? "" : "fail"}`}>
+            {message.channel} · {delivery}
+          </span>
+        </div>
+        {(message.blocks || []).map((block, i) => (
+          <Block key={i} block={block} idx={i} />
+        ))}
       </div>
-      {(message.blocks || []).map((block, i) => (
-        <Block key={i} block={block} idx={i} />
-      ))}
     </div>
   );
 }
