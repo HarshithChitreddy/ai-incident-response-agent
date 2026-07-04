@@ -21,7 +21,7 @@ export default function IncidentList() {
           <span className="stat-value">{open.length}</span>
           <span className="stat-label">open incidents</span>
         </div>
-        <div className="stat">
+        <div className="stat stat-critical">
           <span className="stat-value">{critical.length}</span>
           <span className="stat-label">critical</span>
         </div>
@@ -53,8 +53,8 @@ export default function IncidentList() {
               <tr key={incident.id}>
                 <td><SeverityBadge severity={incident.severity} /></td>
                 <td><StatusBadge status={incident.status} /></td>
-                <td>{incident.service}</td>
-                <td>{incident.alertname}</td>
+                <td className="mono">{incident.service}</td>
+                <td className="mono">{incident.alertname}</td>
                 <td>
                   <Link to={`/incidents/${incident.id}`} className="incident-link">
                     {incident.title}
