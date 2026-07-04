@@ -1,7 +1,17 @@
+// Renders stored Block Kit messages in actual-Slack layout: avatar block,
+// bold sender + timestamp line, body below. Emoji shortcodes are stripped —
+// severity is communicated by the message text and the incident's own badges.
+
 import { fmtTs } from "../services/format";
 
+const SHORTCODE = /:[a-z0-9_+-]+:\s?/g;
+
+function clean(text) {
+  return (text || "").replace(SHORTCODE, "").trim();
+}
+
 function mrkdwn(text, key) {
-  const parts = (text || "").split(/(\*[^*\n]+\*|`[^`\n]+`)/g).filter(Boolean);
+  const parts = clean(text).split(/(\*[^*\n]+\*|`[^`\n]+`)/g).filter(Boolean);
   return parts.map((part, i) => {
     if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
       return <strong key={`${key}-${i}`}>{part.slice(1, -1)}</strong>;
@@ -28,7 +38,7 @@ function MrkdwnText({ text, k }) {
 function Block({ block, idx }) {
   switch (block.type) {
     case "header":
-      return <div className="slack-header-text">{block.text?.text}</div>;
+      return <div className="slack-header-text">{clean(block.text?.text)}</div>;
     case "section":
       if (block.fields) {
         return (
