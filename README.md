@@ -29,3 +29,43 @@ misses by design. Reproduce with:
 ```bash
 cd backend && python -m app.ml.train && python -m app.ml.eval_agent
 ```
+
+## Architecture
+
+```
+                 ┌──────────────────────────────────────────────────────────────┐
+                 │                        docker compose                        │
+                 │                                                              │
+ Alertmanager-   │  ┌────────────┐   POST /alerts/webhook   ┌────────────────┐  │
+ compatible ────────▶  FastAPI    ├─────────────────────────▶ incident_service│  │
+ simulator       │  │  backend   │   dedupe by fingerprint  └───────┬────────┘  │
+ (scripts/)      │  └─────┬──────┘                                  │           │
+                 │        │ background task                         ▼           │
+                 │        ▼                                  ┌─────────────┐    │
+                 │  ┌───────────────────────────────┐        │ PostgreSQL  │    │
+                 │  │   LangGraph triage agent      │◀──────▶│ incidents   │    │
+                 │  │  ┌───────┐      ┌─────────┐   │ traces │ alert_events│    │
+                 │  │  │ agent │◀────▶│  tools  │   │        │ agent_runs  │    │
+                 │  │  └───┬───┘      └────┬────┘   │        │ trace_steps │    │
+                 │  └──────┼───────────────┼────────┘        │ slack_msgs  │    │
+                 │         │               │                 └─────────────┘    │
+                 │   Claude API      commits/logs/metrics (data/)               │
+                 │   (or MOCK_LLM)   ChromaDB runbook RAG (MiniLM, local)       │
+                 │                   sklearn severity model · historical PG     │
+                 │         │                                                    │
+                 │         ▼                                                    │
+                 │   Slack brief (Block Kit) ──▶ stored + optional webhook      │
+                 │   Postmortem on resolve                                      │
+                 │                                                              │
+                 │  ┌────────────┐  /api proxy   ┌───────────┐                  │
+                 │  │ React      │◀──────────────│  nginx    │  :3000           │
+                 │  │ dashboard  │               └───────────┘                  │
+                 │  └────────────┘                                              │
+                 └──────────────────────────────────────────────────────────────┘
+```
+
+**Agent tools** (each call traced to Postgres): `get_recent_commits`, `search_logs`,
+`query_metrics`, `retrieve_runbook` (ChromaDB semantic search, keyword fallback),
+`find_similar_incidents`, `predict_severity` (trained sklearn model, heuristic
+fallback), `rank_likely_commits`. Slack brief and postmortem generation run as
+deterministic steps — every incident gets them.
