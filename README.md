@@ -69,3 +69,35 @@ cd backend && python -m app.ml.train && python -m app.ml.eval_agent
 `find_similar_incidents`, `predict_severity` (trained sklearn model, heuristic
 fallback), `rank_likely_commits`. Slack brief and postmortem generation run as
 deterministic steps — every incident gets them.
+
+## Quick start
+
+```bash
+cp .env.example .env
+docker compose up --build -d
+docker compose exec backend python -m app.db.seed      # historical incidents -> Postgres
+docker compose exec backend python -m app.rag.index    # build runbook vector index
+docker compose exec backend python -m app.ml.train     # train the severity model
+
+# fire a synthetic alert (Prometheus Alertmanager-compatible payload)
+python -m pip install httpx
+python scripts/send_alert.py high_error_rate
+
+open http://localhost:3000        # dashboard
+open http://localhost:8000/docs   # API (Swagger)
+
+# resolve -> generates the postmortem + resolved Slack message
+python scripts/send_alert.py high_error_rate --resolve
+```
+
+Scenarios: `high_error_rate`, `db_connection_pool`, `high_latency`, `memory_leak`.
+
+### Mock mode (default: no API costs)
+
+`MOCK_LLM=true` (the default everywhere) swaps the Claude client for a deterministic
+mock that drives the full tool-calling loop, grounds its verdict in the commit-ranking
+tool output, and produces realistic briefs and postmortems — the entire system runs
+token-free. Set `MOCK_LLM=false` + `ANTHROPIC_API_KEY` in `.env` for real analysis.
+
+Runbook retrieval is real RAG even in mock mode: ChromaDB persisted locally with ONNX
+MiniLM embeddings (no API key), markdown-section chunking, keyword fallback.
