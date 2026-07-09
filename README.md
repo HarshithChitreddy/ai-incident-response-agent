@@ -101,3 +101,27 @@ token-free. Set `MOCK_LLM=false` + `ANTHROPIC_API_KEY` in `.env` for real analys
 
 Runbook retrieval is real RAG even in mock mode: ChromaDB persisted locally with ONNX
 MiniLM embeddings (no API key), markdown-section chunking, keyword fallback.
+
+## Example API requests
+
+```bash
+# ingest an Alertmanager webhook (multiple alerts per delivery supported)
+curl -X POST localhost:8000/api/v1/alerts/webhook -H 'content-type: application/json' -d '{
+  "version": "4", "status": "firing",
+  "alerts": [{
+    "status": "firing",
+    "labels": {"alertname": "HighErrorRate", "service": "checkout-service", "severity": "critical"},
+    "annotations": {"summary": "error rate 12.4%"},
+    "startsAt": "2026-07-07T14:02:00Z", "endsAt": "0001-01-01T00:00:00Z",
+    "fingerprint": "a3f8c2e91b4d7f06"
+  }]
+}'
+
+curl localhost:8000/api/v1/incidents                     # list (filter: ?status=open)
+curl localhost:8000/api/v1/incidents/<id>                # detail + alert events
+curl localhost:8000/api/v1/incidents/<id>/analysis       # root cause, confidence, candidates
+curl localhost:8000/api/v1/incidents/<id>/trace          # step-by-step reasoning trace
+curl localhost:8000/api/v1/incidents/<id>/slack          # Block Kit message feed
+curl -X POST localhost:8000/api/v1/incidents/<id>/resolve
+curl localhost:8000/api/v1/incidents/<id>/postmortem     # markdown postmortem
+```
