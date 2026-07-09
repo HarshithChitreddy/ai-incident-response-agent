@@ -125,3 +125,57 @@ curl localhost:8000/api/v1/incidents/<id>/slack          # Block Kit message fee
 curl -X POST localhost:8000/api/v1/incidents/<id>/resolve
 curl localhost:8000/api/v1/incidents/<id>/postmortem     # markdown postmortem
 ```
+
+## Dashboard
+
+<!-- screenshots: capture at http://localhost:3000 after firing an alert -->
+| Incident list | Incident detail |
+|---|---|
+| ![incident list](docs/screenshots/incident-list.png) | ![incident detail](docs/screenshots/incident-detail.png) |
+
+Incident detail shows the AI analysis (confidence bar, competing candidates, "why this
+might be wrong"), the retrieved runbook with matched sections, the agent's reasoning
+trace with expandable tool inputs/outputs and token counts, the Slack feed rendered as
+Block Kit, and the postmortem.
+
+## Tests
+
+```bash
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest            # 60 tests: webhook, tools, agent flow, RAG relevance, ML, Slack
+```
+
+Tests run on in-memory SQLite with mock LLM forced on — no infra, no tokens. RAG tests
+run real MiniLM embeddings and assert retrieval relevance per alert class.
+
+## Project structure
+
+```
+backend/app/
+  api/        alerts webhook + incident/analysis/trace/slack/postmortem endpoints
+  agents/     LangGraph triage graph, runner, per-step tracer
+  tools/      7 agent tools + registry + Slack/postmortem generation
+  rag/        ChromaDB runbook index (persisted, fingerprint-guarded)
+  ml/         severity model training/inference + 12-case agent eval harness
+  services/   LLM seam (mock/real), Slack service, incident ingestion
+  models/     SQLAlchemy: incidents, events, runs, trace steps, slack messages
+backend/tests/  60 pytest tests
+frontend/       React dashboard (Vite, nginx + /api proxy in docker)
+data/           synthetic alerts/logs/metrics/commits, runbooks, eval set
+scripts/        send_alert.py — Alertmanager-compatible simulator
+```
+
+## Resume bullets
+
+> - Built an autonomous incident-response agent (FastAPI, LangGraph, Claude) that
+>   triages production alerts by collecting evidence across commits, logs, metrics, and
+>   runbooks, achieving **83% top-1 / 100% top-3 root-cause attribution** on a
+>   12-incident eval set with planted culprit commits.
+> - Implemented RAG runbook retrieval with ChromaDB and locally-run MiniLM embeddings
+>   with per-section markdown chunking, plus a trained scikit-learn severity classifier
+>   (**86.9% accuracy / 0.85 macro-F1**) served behind a heuristic-fallback interface.
+> - Designed a mock-LLM seam replicating Claude's wire format, enabling token-free
+>   end-to-end testing of the full agent loop (60 pytest tests), with per-step agent
+>   traces persisted to PostgreSQL and rendered in a React ops dashboard.
