@@ -1,0 +1,162 @@
+{
+  "high_error_rate": {
+    "version": "4",
+    "groupKey": "{}:{alertname=\"HighErrorRate\", service=\"checkout-service\"}",
+    "status": "firing",
+    "receiver": "incident-response-agent",
+    "groupLabels": { "alertname": "HighErrorRate" },
+    "commonLabels": {
+      "alertname": "HighErrorRate",
+      "service": "checkout-service",
+      "severity": "critical",
+      "team": "payments",
+      "env": "production"
+    },
+    "commonAnnotations": {
+      "summary": "checkout-service error rate at 12.4% (threshold 2%)",
+      "description": "5xx error rate for checkout-service has been above 2% for 5 minutes. Current value: 12.4%. Most errors originate from POST /api/checkout/confirm.",
+      "runbook": "runbooks/high-error-rate.md"
+    },
+    "externalURL": "http://alertmanager:9093",
+    "alerts": [
+      {
+        "status": "firing",
+        "labels": {
+          "alertname": "HighErrorRate",
+          "service": "checkout-service",
+          "severity": "critical",
+          "team": "payments",
+          "env": "production"
+        },
+        "annotations": {
+          "summary": "checkout-service error rate at 12.4% (threshold 2%)",
+          "description": "5xx error rate for checkout-service has been above 2% for 5 minutes. Current value: 12.4%. Most errors originate from POST /api/checkout/confirm."
+        },
+        "startsAt": "2026-07-07T14:02:00Z",
+        "endsAt": "0001-01-01T00:00:00Z",
+        "generatorURL": "http://prometheus:9090/graph?g0.expr=rate%28http_requests_total%7Bstatus%3D~%225..%22%7D%5B5m%5D%29",
+        "fingerprint": "a3f8c2e91b4d7f06"
+      }
+    ]
+  },
+  "high_latency": {
+    "version": "4",
+    "groupKey": "{}:{alertname=\"HighLatencyP95\", service=\"search-service\"}",
+    "status": "firing",
+    "receiver": "incident-response-agent",
+    "groupLabels": { "alertname": "HighLatencyP95" },
+    "commonLabels": {
+      "alertname": "HighLatencyP95",
+      "service": "search-service",
+      "severity": "warning",
+      "team": "discovery",
+      "env": "production"
+    },
+    "commonAnnotations": {
+      "summary": "search-service p95 latency at 2400ms (threshold 800ms)",
+      "description": "p95 latency for GET /api/search has been above 800ms for 10 minutes. Current value: 2400ms.",
+      "runbook": "runbooks/high-latency.md"
+    },
+    "externalURL": "http://alertmanager:9093",
+    "alerts": [
+      {
+        "status": "firing",
+        "labels": {
+          "alertname": "HighLatencyP95",
+          "service": "search-service",
+          "severity": "warning",
+          "team": "discovery",
+          "env": "production"
+        },
+        "annotations": {
+          "summary": "search-service p95 latency at 2400ms (threshold 800ms)",
+          "description": "p95 latency for GET /api/search has been above 800ms for 10 minutes. Current value: 2400ms."
+        },
+        "startsAt": "2026-07-07T14:10:00Z",
+        "endsAt": "0001-01-01T00:00:00Z",
+        "generatorURL": "http://prometheus:9090/graph?g0.expr=histogram_quantile%280.95%2C+http_request_duration_seconds%29",
+        "fingerprint": "b7e1d4a208c95f31"
+      }
+    ]
+  },
+  "db_connection_pool": {
+    "version": "4",
+    "groupKey": "{}:{alertname=\"DBConnectionPoolExhausted\", service=\"orders-service\"}",
+    "status": "firing",
+    "receiver": "incident-response-agent",
+    "groupLabels": { "alertname": "DBConnectionPoolExhausted" },
+    "commonLabels": {
+      "alertname": "DBConnectionPoolExhausted",
+      "service": "orders-service",
+      "severity": "critical",
+      "team": "fulfillment",
+      "env": "production"
+    },
+    "commonAnnotations": {
+      "summary": "orders-service DB connection pool exhausted (0 idle of 5)",
+      "description": "orders-service has had zero idle database connections for 5 minutes. Requests are queueing and timing out waiting for a connection.",
+      "runbook": "runbooks/db-connection-pool.md"
+    },
+    "externalURL": "http://alertmanager:9093",
+    "alerts": [
+      {
+        "status": "firing",
+        "labels": {
+          "alertname": "DBConnectionPoolExhausted",
+          "service": "orders-service",
+          "severity": "critical",
+          "team": "fulfillment",
+          "env": "production"
+        },
+        "annotations": {
+          "summary": "orders-service DB connection pool exhausted (0 idle of 5)",
+          "description": "orders-service has had zero idle database connections for 5 minutes. Requests are queueing and timing out waiting for a connection."
+        },
+        "startsAt": "2026-07-07T14:20:00Z",
+        "endsAt": "0001-01-01T00:00:00Z",
+        "generatorURL": "http://prometheus:9090/graph?g0.expr=db_pool_idle_connections",
+        "fingerprint": "c9d0e6f5137a842b"
+      }
+    ]
+  },
+  "memory_leak": {
+    "version": "4",
+    "groupKey": "{}:{alertname=\"HighMemoryUsage\", service=\"recommendation-service\"}",
+    "status": "firing",
+    "receiver": "incident-response-agent",
+    "groupLabels": { "alertname": "HighMemoryUsage" },
+    "commonLabels": {
+      "alertname": "HighMemoryUsage",
+      "service": "recommendation-service",
+      "severity": "warning",
+      "team": "discovery",
+      "env": "production"
+    },
+    "commonAnnotations": {
+      "summary": "recommendation-service memory at 91% of limit and climbing",
+      "description": "Container memory usage for recommendation-service has risen steadily from 62% to 91% over 6 hours with flat traffic. OOM kill likely within the hour.",
+      "runbook": "runbooks/memory-leak.md"
+    },
+    "externalURL": "http://alertmanager:9093",
+    "alerts": [
+      {
+        "status": "firing",
+        "labels": {
+          "alertname": "HighMemoryUsage",
+          "service": "recommendation-service",
+          "severity": "warning",
+          "team": "discovery",
+          "env": "production"
+        },
+        "annotations": {
+          "summary": "recommendation-service memory at 91% of limit and climbing",
+          "description": "Container memory usage for recommendation-service has risen steadily from 62% to 91% over 6 hours with flat traffic. OOM kill likely within the hour."
+        },
+        "startsAt": "2026-07-07T14:30:00Z",
+        "endsAt": "0001-01-01T00:00:00Z",
+        "generatorURL": "http://prometheus:9090/graph?g0.expr=container_memory_usage_bytes",
+        "fingerprint": "d2c4b8a67e90f153"
+      }
+    ]
+  }
+}
