@@ -30,6 +30,23 @@ async def predict_severity(
     cpu_pct: float | None = None,
     deploy_within_hour: bool = False,
 ) -> dict:
+    from app.ml.model import get_severity_model  # deferred: keeps sklearn off the import path
+
+    model = get_severity_model()
+    if model is not None:
+        prediction = model.predict(
+            {
+                "alertname": alertname,
+                "error_rate_pct": error_rate_pct,
+                "latency_p95_ms": latency_p95_ms,
+                "memory_pct": memory_pct,
+                "request_rate_rps": request_rate_rps,
+                "cpu_pct": cpu_pct,
+                "deploy_within_hour": deploy_within_hour,
+            }
+        )
+        return {"service": service, "alertname": alertname, **prediction}
+
     return {
         "service": service,
         "alertname": alertname,
