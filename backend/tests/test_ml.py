@@ -83,3 +83,25 @@ async def test_tool_prefers_model_and_falls_back(trained_dir, session_factory, m
         )
         assert heuristic_result["method"].startswith("heuristic")
         assert heuristic_result["severity"] == "critical"
+
+
+async def test_eval_ranker_hits_planted_culprits():
+    report = await run_eval(use_agent=False)
+
+    assert report["cases"] == 12
+    assert report["ranker"]["top1_accuracy"] >= 0.75
+    # the two designed misses keep the metric honest
+    misses = [r["case"] for r in report["per_case"] if not r["ranker_correct"]]
+    assert len(misses) <= 3
+
+
+async def test_eval_agent_pipeline_end_to_end():
+    report = await run_eval(limit=2, use_agent=True, llm=MockLLMClient())
+
+    assert report["agent"]["total"] == 2
+    for row in report["per_case"]:
+        assert row["run_status"] == "completed"
+        assert row["agent_top"]  # mock grounds its verdict in the ranker output
+    # on these two clean cases the pipeline should attribute correctly
+    assert report["agent"]["top1_accuracy"] == 1.0
+    assert report["agent"]["candidate_recall"] >= report["agent"]["top1_accuracy"]
