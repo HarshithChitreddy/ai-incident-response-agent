@@ -73,6 +73,9 @@ class LLMClient(Protocol):
 # Mock implementation
 # --------------------------------------------------------------------------- #
 
+_SERVICE_RE = re.compile(r"\b[a-z][a-z0-9]*(?:-[a-z0-9]+)*-service\b")
+_ALERTNAME_RE = re.compile(r"alertname[\"':\s]+([A-Za-z][A-Za-z0-9_]+)")
+
 
 class MockLLMClient:
     def __init__(self, model: str = "mock-claude") -> None:
@@ -127,17 +130,54 @@ class MockLLMClient:
     def _fake_input(self, schema: dict[str, Any], messages: list[Message]) -> dict[str, Any]:
         props: dict[str, Any] = schema.get("properties", {})
         required = set(schema.get("required", list(props)))
+        observed = self._observed_metrics(messages)
         out: dict[str, Any] = {}
         for name, spec in props.items():
             if name in required:
                 out[name] = self._fake_value(name, spec, messages)
+            elif spec.get("type") == "number" and name in observed:
+                # optional numerics get the values actually observed earlier in
+                # the loop (query_metrics result) — like a real model would pass
+                out[name] = observed[name]
         return out
+
+    @staticmethod
+    def _observed_metrics(messages: list[Message]) -> dict[str, float]:
+        """Current metric values from a query_metrics tool result, if any."""
+        for msg in reversed(messages):
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not (isinstance(block, dict) and block.get("type") == "tool_result"):
+                    continue
+                try:
+                    parsed = json.loads(block.get("content", ""))
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    continue
+                summary = parsed.get("summary") if isinstance(parsed, dict) else None
+                if isinstance(summary, dict) and summary:
+                    return {
+                        key: stats["current"]
+                        for key, stats in summary.items()
+                        if isinstance(stats, dict) and isinstance(stats.get("current"), (int, float))
+                    }
+        return {}
 
     def _fake_value(self, name: str, spec: dict[str, Any], messages: list[Message]) -> Any:
         if "enum" in spec:
             return spec["enum"][0]
         match spec.get("type"):
             case "string":
+                if "alertname" in name or "alert_name" in name:
+                    return self._detect_alertname(messages) or "HighErrorRate"
+                if "service" in name:
+                    return self._detect_service(messages)
+                if any(k in name for k in ("query", "pattern", "keyword")):
+                    # compose a realistic search query from the incident context
+                    alertname = self._detect_alertname(messages)
+                    service = self._detect_service(messages)
+                    return f"{alertname} {service} error".strip()
                 return f"mock-{name}"
             case "integer":
                 return 5
@@ -150,8 +190,64 @@ class MockLLMClient:
             case _:
                 return {}
 
+    @staticmethod
+    def _all_text(messages: list[Message]) -> str:
+        chunks: list[str] = []
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, str):
+                chunks.append(content)
+            elif isinstance(content, list):
+                for b in content:
+                    if isinstance(b, dict):
+                        chunks.append(str(b.get("text", "")) + str(b.get("content", "")))
+        return " ".join(chunks)
+
+    @classmethod
+    def _detect_service(cls, messages: list[Message]) -> str:
+        match = _SERVICE_RE.search(cls._all_text(messages))
+        return match.group(0) if match else "checkout-service"
+
+    @classmethod
+    def _detect_alertname(cls, messages: list[Message]) -> str:
+        match = _ALERTNAME_RE.search(cls._all_text(messages))
+        return match.group(1) if match else ""
+
+    @staticmethod
+    def _ranked_shas_from_tools(messages: list[Message]) -> list[str]:
+        """Pull the rank_likely_commits tool result out of the conversation so
+        the mock's verdict is grounded in the actual evidence pipeline — this
+        is what makes mock-mode agent evals measure ranking quality, not
+        canned text."""
+        id_to_name: dict[str, str] = {}
+        results: dict[str, str] = {}
+        for msg in messages:
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "tool_use":
+                    id_to_name[block.get("id", "")] = block.get("name", "")
+                elif block.get("type") == "tool_result":
+                    results[block.get("tool_use_id", "")] = block.get("content", "")
+
+        for tool_id, name in id_to_name.items():
+            if name != "rank_likely_commits" or tool_id not in results:
+                continue
+            try:
+                ranked = json.loads(results[tool_id])
+            except (json.JSONDecodeError, TypeError, ValueError):
+                continue
+            if isinstance(ranked, list):
+                shas = [c.get("sha") for c in ranked if isinstance(c, dict) and c.get("sha")]
+                if shas:
+                    return shas
+        return []
+
     def _final_text(self, system: str, messages: list[Message]) -> str:
-        service = "checkout-service"
+        service = self._detect_service(messages)
         blob = (system + " " + json.dumps(messages, default=str)).lower()
 
         if "postmortem" in blob:
@@ -159,8 +255,9 @@ class MockLLMClient:
         if "slack" in blob:
             return _SLACK_BRIEF_TEMPLATE.format(service=service)
 
-        top_sha = "9f2c41ab7e03"
-        runner_up = "4b8e19d3c5f7"
+        shas = self._ranked_shas_from_tools(messages)
+        top_sha = shas[0] if shas else "9f2c41ab7e03"
+        runner_up = shas[1] if len(shas) > 1 else "4b8e19d3c5f7"
 
         analysis = {
             "root_cause": (
