@@ -13,7 +13,21 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 @router.post("/webhook", status_code=202, response_model=WebhookIngestResult)
 async def receive_alert_webhook(
     payload: AlertmanagerWebhook,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    session_factory: async_sessionmaker = Depends(get_session_factory),
 ) -> WebhookIngestResult:
-    """Entry point for Alertmanager-compatible alerts (real or simulated)."""
-    return await ingest_webhook(db, payload)
+    """Entry point for Alertmanager-compatible alerts (real or simulated).
+
+    New incidents kick off the triage agent; resolved ones kick off postmortem
+    generation. Both run as background tasks so the webhook responds fast —
+    Alertmanager retries slow receivers.
+    """
+    result = await ingest_webhook(db, payload)
+
+    for incident_id in result.created:
+        background_tasks.add_task(run_triage_for_incident, incident_id, session_factory)
+    for incident_id in result.resolved:
+        background_tasks.add_task(run_postmortem_for_incident, incident_id, session_factory)
+
+    return result
