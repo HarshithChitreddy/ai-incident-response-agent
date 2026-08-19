@@ -31,6 +31,41 @@ get_settings.cache_clear()
 # dir so tests never write to the repo's chroma_data/.
 # ---------------------------------------------------------------------------
 
+_index_cache: dict = {}
+_index_lock = threading.Lock()
+
+
+def _get_or_build_index(persist_dir):
+    from app.rag.store import RunbookIndex
+
+    with _index_lock:
+        if "index" not in _index_cache:
+            index = RunbookIndex(
+                persist_dir=persist_dir,
+                runbooks_dir=get_settings().data_dir / "runbooks",
+            )
+            index.ensure_indexed()
+            _index_cache["index"] = index
+        return _index_cache["index"]
+
+
+@pytest.fixture(scope="session")
+def _chroma_tmp(tmp_path_factory):
+    return tmp_path_factory.mktemp("chroma-test")
+
+
+@pytest.fixture(scope="session")
+def runbook_index(_chroma_tmp):
+    return _get_or_build_index(_chroma_tmp)
+
+
+@pytest.fixture(autouse=True)
+def _route_runbook_index(monkeypatch, _chroma_tmp):
+    """Point the process-wide index accessor at the test index (lazily)."""
+    monkeypatch.setattr(
+        "app.rag.store.get_runbook_index", lambda: _get_or_build_index(_chroma_tmp)
+    )
+
 
 @pytest.fixture
 async def db_engine():
