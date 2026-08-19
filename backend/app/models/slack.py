@@ -26,4 +26,4 @@ class SlackMessage(Base):
     transport: Mapped[str] = mapped_column(String(16), default="mock")  # mock | slack_webhook
     delivered: Mapped[bool] = mapped_column(default=True)
     delivery_error: Mapped[str] = mapped_column(Text, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

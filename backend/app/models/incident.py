@@ -27,10 +27,10 @@ class Incident(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     labels: Mapped[dict] = mapped_column(JSONVariant, default=dict)
     annotations: Mapped[dict] = mapped_column(JSONVariant, default=dict)
-    started_at: Mapped[datetime] = mapped_column(DateTime)
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     events: Mapped[list["AlertEvent"]] = relationship(
         back_populates="incident",
@@ -51,7 +51,7 @@ class AlertEvent(Base):
     )
     status: Mapped[str] = mapped_column(String(16))
     payload: Mapped[dict] = mapped_column(JSONVariant, default=dict)
-    received_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     incident: Mapped[Incident] = relationship(back_populates="events")
 
