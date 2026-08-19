@@ -15,6 +15,7 @@ from sqlalchemy import or_, select
 from app.models import HistoricalIncident
 from app.tools.base import ToolContext
 
+logger = logging.getLogger(__name__)
 
 _WORD_RE = re.compile(r"[a-z][a-z0-9]+")
 _STOPWORDS = {"the", "and", "for", "with", "this", "that", "runbook", "alert"}
@@ -79,8 +80,39 @@ async def query_metrics(ctx: ToolContext, service: str) -> dict:
 
 
 async def retrieve_runbook(ctx: ToolContext, query: str) -> dict:
-    """Keyword-matching runbook lookup: scores each runbook file by token
-    overlap with the query, title matches weighted 3x."""
+    """Semantic retrieval over the runbook library (ChromaDB + MiniLM), falling
+    back to keyword matching if the vector store is unavailable."""
+    from app.rag.store import get_runbook_index  # deferred: chromadb import is heavy
+
+    index = ctx.runbook_index or get_runbook_index()
+    try:
+        chunks = await index.search(query, k=4)
+    except Exception:
+        logger.exception("vector retrieval failed; falling back to keyword matching")
+        chunks = []
+    if not chunks:
+        return await _keyword_retrieve_runbook(ctx, query)
+
+    best = chunks[0]
+    return {
+        "runbook": best.source,
+        "retriever": "chroma/all-MiniLM-L6-v2",
+        "match_score": best.score,
+        "matched_sections": [
+            {
+                "source": c.source,
+                "section": c.section,
+                "score": c.score,
+                "excerpt": c.content[:400],
+            }
+            for c in chunks
+        ],
+        "content": (index.runbooks_dir / best.source).read_text(),
+    }
+
+
+async def _keyword_retrieve_runbook(ctx: ToolContext, query: str) -> dict:
+    """Phase 2 keyword matcher, kept as the degraded-mode path."""
     query_tokens = _tokens(query)
     best_name, best_score, best_content = None, -1.0, ""
 
@@ -97,7 +129,7 @@ async def retrieve_runbook(ctx: ToolContext, query: str) -> dict:
     return {
         "runbook": best_name,
         "match_score": best_score,
-        "retriever": "keyword",
+        "retriever": "keyword-fallback",
         "content": best_content,
     }
 
