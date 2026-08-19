@@ -6,6 +6,9 @@ import { duration, fmtTs, pct } from "../services/format";
 import { SeverityBadge, StatusBadge } from "../components/Badges";
 import Panel, { Empty } from "../components/Panel";
 import ConfidenceBar from "../components/ConfidenceBar";
+import Markdown from "../components/Markdown";
+import SlackPreview from "../components/SlackPreview";
+import TraceTimeline from "../components/TraceTimeline";
 
 export default function IncidentDetail() {
   const { id } = useParams();
@@ -13,11 +16,16 @@ export default function IncidentDetail() {
 
   const { data: incident } = usePolling(() => api.incident(id), [id], 3000);
   const { data: analysisEnvelope } = usePolling(() => api.analysis(id), [id], 4000);
+  const { data: trace } = usePolling(() => api.trace(id), [id], 4000);
+  const { data: slack } = usePolling(() => api.slack(id), [id], 5000);
+  const { data: postmortem } = usePolling(() => api.postmortem(id), [id], 5000);
 
   if (incident === undefined) return <Empty>loading…</Empty>;
   if (incident === null) return <Empty>Incident not found. <Link to="/">Back to list</Link></Empty>;
 
   const analysis = analysisEnvelope?.analysis;
+  const runbookStep = (trace || []).find((s) => s.name === "retrieve_runbook");
+  const runbook = runbookStep?.output;
 
   const onResolve = async () => {
     setResolving(true);
@@ -114,9 +122,100 @@ export default function IncidentDetail() {
               </>
             )}
           </Panel>
+
+          <Panel
+            title="Matched runbook"
+            right={runbook && <span className="muted mono">{runbook.retriever}</span>}
+          >
+            {!runbook ? (
+              <Empty>no runbook retrieved yet</Empty>
+            ) : (
+              <>
+                <div className="runbook-head">
+                  <span className="mono">{runbook.runbook}</span>
+                  {typeof runbook.match_score === "number" && (
+                    <span className="muted">score {runbook.match_score}</span>
+                  )}
+                </div>
+                {(runbook.matched_sections || []).length > 0 && (
+                  <div className="runbook-sections">
+                    {runbook.matched_sections.map((section, i) => (
+                      <span key={i} className="section-chip">
+                        {section.section || "intro"} · {section.score}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <details>
+                  <summary>full runbook</summary>
+                  <Markdown text={runbook.content} />
+                </details>
+              </>
+            )}
+          </Panel>
+
+          <Panel title="Postmortem">
+            {postmortem === null || postmortem === undefined ? (
+              <Empty>
+                {incident.status === "resolved"
+                  ? "generating postmortem…"
+                  : "available after the incident is resolved"}
+              </Empty>
+            ) : (
+              <Markdown text={postmortem.markdown} />
+            )}
+          </Panel>
         </div>
 
-        <div className="detail-col" />
+        <div className="detail-col">
+          <Panel
+            title="Agent reasoning trace"
+            right={trace && <span className="muted">{trace.length} steps</span>}
+            className="panel-trace"
+          >
+            {!trace || trace.length === 0 ? (
+              <Empty>no trace yet</Empty>
+            ) : (
+              <TraceTimeline steps={trace} />
+            )}
+          </Panel>
+
+          <Panel title="Slack feed">
+            {!slack || slack.length === 0 ? (
+              <Empty>no messages yet</Empty>
+            ) : (
+              slack.map((message) => <SlackPreview key={message.id} message={message} />)
+            )}
+            {analysis?.slack_brief && (
+              <details className="brief-raw">
+                <summary>LLM-drafted brief (raw text)</summary>
+                <pre>{analysis.slack_brief}</pre>
+              </details>
+            )}
+          </Panel>
+
+          <Panel title="Alert details">
+            <div className="chips">
+              {Object.entries(incident.labels || {}).map(([key, value]) => (
+                <span key={key} className="chip">
+                  <span className="chip-key">{key}</span>={value}
+                </span>
+              ))}
+            </div>
+            {incident.description && <p className="muted">{incident.description}</p>}
+            <h4>Alert events</h4>
+            <ul className="events">
+              {(incident.events || []).map((event) => (
+                <li key={event.id}>
+                  <span className={`event-dot event-${event.status}`} />
+                  <span className="mono">{event.status}</span>
+                  <span className="muted">{fmtTs(event.received_at)}</span>
+                </li>
+              ))}
+            </ul>
+            <div className="muted mono small">fingerprint {incident.fingerprint}</div>
+          </Panel>
+        </div>
       </div>
     </div>
   );
