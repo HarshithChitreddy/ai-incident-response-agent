@@ -9,3 +9,4 @@ chroma_data/
 .DS_Store
 node_modules/
 frontend/dist/
+backend/app/ml/artifacts/

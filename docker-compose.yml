@@ -21,6 +21,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://incident:incident@db:5432/incident_response
       DATA_DIR: /app/data
       CHROMA_PERSIST_DIR: /app/chroma_data
+      MODEL_DIR: /app/app/ml/artifacts
       MOCK_LLM: ${MOCK_LLM:-true}
       SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
