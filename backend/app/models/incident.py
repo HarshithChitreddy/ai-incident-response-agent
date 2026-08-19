@@ -54,3 +54,24 @@ class AlertEvent(Base):
     received_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     incident: Mapped[Incident] = relationship(back_populates="events")
+
+
+class HistoricalIncident(Base):
+    """Labeled past incidents, seeded from data/historical_incidents.csv.
+    Training data for the Phase 4 ML model and retrieval context for the agent."""
+
+    __tablename__ = "historical_incidents"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    service: Mapped[str] = mapped_column(String(255))
+    alertname: Mapped[str] = mapped_column(String(255))
+    severity: Mapped[str] = mapped_column(String(32))
+    error_rate_pct: Mapped[float] = mapped_column(Float)
+    latency_p95_ms: Mapped[float] = mapped_column(Float)
+    request_rate_rps: Mapped[float] = mapped_column(Float)
+    cpu_pct: Mapped[float] = mapped_column(Float)
+    memory_pct: Mapped[float] = mapped_column(Float)
+    deploy_within_hour: Mapped[bool]
+    root_cause: Mapped[str] = mapped_column(String(64))
+    time_to_resolve_min: Mapped[int]
+    summary: Mapped[str] = mapped_column(Text, default="")
